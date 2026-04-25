@@ -34,6 +34,20 @@
     background-color: var(--color-off-white);
     color: var(--color-blue-900);
     font-family: var(--font-sans);
+    @apply antialiased;
+  }
+}
+
+/* Disable all non-essential animations sitewide for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-delay: -1ms !important;
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    background-attachment: initial !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0s !important;
+    transition-delay: 0s !important;
   }
 }
 
