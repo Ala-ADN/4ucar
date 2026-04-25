@@ -56,7 +56,7 @@ The University of Carthage (UCAR) oversees 35 affiliated institutions operating 
 
 | Role                 | Primary Module                 | Key Need                                                |
 | -------------------- | ------------------------------ | ------------------------------------------------------- |
-| University President | KPI Dashboard, Alerts          | Consolidated cross-institution view, ranking prediction |
+| University President | KPI Dashboard, Alerts, Accreditation | Consolidated cross-institution view, accreditation posture |
 | Dean / Director      | KPI Dashboard, Alerts          | Institution-level KPIs vs. UCAR benchmarks              |
 | Administrative Staff | Document Ingestion, HR         | Efficient document upload, request tracking             |
 | Faculty Member       | HR Dashboard, Project Matching | Workload visibility, project assignment transparency    |
@@ -120,7 +120,7 @@ The University of Carthage (UCAR) oversees 35 affiliated institutions operating 
 | Cache              | Redis 7                                               | KPI cache, session, pub/sub for alerts                |
 | AI OCR             | Tesseract 5 + GPT-4o vision for correction            | Cost-effective; LLM handles ambiguous scans           |
 | NLP / Chat         | Claude API (claude-sonnet-4-20250514) + LangChain RAG | Bilingual; document-grounded answers                  |
-| ML Models          | scikit-learn / PyTorch + SHAP                         | Anomaly detection, ranking prediction, explainability |
+| ML Models          | scikit-learn / PyTorch + SHAP                         | Anomaly detection, explainability |
 | Auth               | JWT + OAuth2 (Keycloak)                               | SSO-ready; Ministry LDAP integration path             |
 | Infrastructure     | Docker + Kubernetes + Terraform                       | 35-tenant scale; horizontal pod autoscaling           |
 | CI/CD              | GitHub Actions                                        | Automated test → build → deploy                       |
@@ -145,6 +145,7 @@ Each institution is a **tenant**. Tenancy is enforced at three levels:
 | `hr-service`      | Professor profiles, workload, hiring workflows, matching        | PostgreSQL, `kpi-service`                       | `specs/hr-service.md`      |
 | `project-service` | Project posting, KPI-based matching, assignment tracking        | PostgreSQL, `kpi-service`, `hr-service`         | `specs/project-service.md` |
 | `alert-service`   | Threshold monitoring, anomaly detection, notification dispatch  | Redis pub/sub, `kpi-service`, email/SMS gateway | `specs/alert-service.md`   |
+| `accreditation-service` | Framework compliance evaluation, indicator status computation, gap analysis | PostgreSQL, `kpi-service`, `doc-service` | `specs/accreditation-service.md` |
 | `nlp-service`     | Natural language queries, document Q&A, report narration        | Elasticsearch, Claude API, `doc-service`        | `specs/nlp-service.md`     |
 | `report-service`  | Scheduled report generation, PDF/Excel export, MESRS format     | `kpi-service`, `doc-service`, Celery            | `specs/report-service.md`  |
 | `auth-service`    | JWT issuance, RBAC enforcement, tenant routing, audit log       | Keycloak, PostgreSQL                            | `specs/auth-service.md`    |
@@ -159,7 +160,7 @@ Each institution is a **tenant**. Tenancy is enforced at three levels:
 The KPI system is designed to simultaneously serve two masters:
 
 1. **Internal governance**: KPIs that UCAR leadership needs to manage 35 institutions operationally (ISO 21001:2018 alignment, HR equity, financial health).
-2. **International ranking signal**: KPIs that directly or proximally map to QS, THE, and Shanghai/ARWU ranking methodologies — the only way to predict and improve UCAR's global standing.
+2. **Accreditation compliance signal**: KPIs that map to the measurable controls in QS, THE, ARWU, ISO 21001, and MESRS frameworks — feeding the accreditation engine with automatically evaluated evidence.
 
 The following section defines the full KPI catalog with explicit ranking mappings and data sources.
 
@@ -292,7 +293,7 @@ _THE: Teaching (staff-to-student) · QS: Faculty/Student Ratio | Internal govern
 | ------- | -------------------------------------- | ------------------------------------------------------------------- | ------------------- | --------- |
 | `HR-01` | Professor Workload Compliance Rate     | Faculty within ±20% of contracted hours ÷ total faculty             | Internal governance | Monthly   |
 | `HR-02` | Teaching Load Balance Index            | Std. deviation of hours across faculty (lower = better)             | Internal governance | Semester  |
-| `HR-03` | Professor-per-Student Ratio            | FTE faculty ÷ enrolled students (inverted of ACA-01)                | **QS 20%**          | Semester  |
+| `HR-03` | Professor-per-Student Ratio            | FTE faculty ÷ enrolled students (reciprocal of ACA-01 — same underlying metric, tracked separately for HR workload reporting) | Internal governance | Semester  |
 | `HR-04` | Administrative Staff per Student       | Admin FTE ÷ enrolled students                                       | Internal governance | Annual    |
 | `HR-05` | Faculty Training Fulfillment Rate      | Training hours completed ÷ training hours required                  | ISO 21001           | Annual    |
 | `HR-06` | Absenteeism Rate (staff)               | Unexcused absences ÷ scheduled days                                 | Internal governance | Monthly   |
@@ -334,50 +335,26 @@ _ISO 21001:2018 alignment — no direct ranking contribution but required for ac
 
 ---
 
-### 4.3 Ranking Score Computation
+### 4.3 Accreditation Compliance Engine
 
-#### Composite Score Formula
+The platform includes a compliance mapping layer modeled after enterprise accreditation tools (Vanta, Drata, Sprinto). Each of the five target frameworks — QS, THE, ARWU, ISO 21001, MESRS — is defined as a set of **Controls**. Each control is satisfied by **Tests**, which are automatically evaluated as evidence flows in: documents ingested through the platform, approved KPI records, and attestations submitted by staff.
 
-Each institution receives a **UCAR Score** (0–100) computed as a weighted composite. The weights below are derived from QS methodology with pragmatic adjustment for measurability at UCAR's current data maturity.
+The key mechanism: every **Document Template** in the system (e.g. "Grade Sheet", "Faculty Record", "Disaster Recovery Procedure") is linked to one or more framework controls. When an institution uploads a document matching that template and it is approved, that document is automatically registered as evidence for each linked control, advancing the institution's compliance progress in real time.
+
+**Control statuses** (matching industry conventions): `PASSING` · `FAILING` · `NEEDS_EVIDENCE` · `NOT_APPLICABLE` (user-declared, with reason — e.g. institution did not participate in a survey cycle)
+
+**Test types**: Automated (KPI computation result meets threshold) · Document upload (approved document of required template type on file) · Attestation (staff acknowledgment, logged and timestamped)
+
+> Full implementation specification: see [`.claude/accreditation.md`](.claude/accreditation.md)
+
+#### UCAR Network Ranking (internal)
+
+Institutions are ranked 1–35 by their **internal UCAR Score** — a weighted composite of computed KPI values used for internal governance and resource allocation decisions. This is an operational governance tool distinct from external framework compliance status. Weights are stored in `ucar_global.kpi_weights`, version-controlled with effective dates, and adjustable by authorized administrators without code deployment.
 
 ```
 UCAR_Score = Σ (normalized_kpi_score_i × weight_i)
+normalized_score_i = (institution_value_i − min_network_i) / (max_network_i − min_network_i) × 100
 ```
-
-Where each KPI is normalized to [0, 100] relative to the best-performing UCAR institution (percentile normalization within the network):
-
-```
-normalized_score_i = (institution_value_i - min_network_i) / (max_network_i - min_network_i) × 100
-```
-
-**Weight table (sum = 100)**
-
-| Domain                      | UCAR Weight | Primary Ranking Proxy        |
-| --------------------------- | ----------- | ---------------------------- |
-| Research & Citations        | 25%         | QS CPF 20% + IRN 5%          |
-| Academic Quality & Teaching | 20%         | QS FSR 20% · THE Teaching    |
-| Employability & Industry    | 18%         | QS ER 10% + EO 5% + Industry |
-| Internationalization        | 12%         | QS IFR 5% + ISR 5% + IRN     |
-| Finance & Resources         | 10%         | THE Income indicators        |
-| Human Resources             | 8%          | QS/THE Staff ratios          |
-| Sustainability & ESG        | 5%          | QS/THE Sustainability        |
-| Governance & Compliance     | 2%          | ISO 21001 (internal only)    |
-
-> **Implementation note**: Weights are stored in the database table `ucar_global.kpi_weights` and can be adjusted by an authorized administrator without a code deployment. Each weight change is version-controlled with an effective date.
-
-#### UCAR Network Ranking
-
-Institutions are ranked 1–35 by their UCAR Score. The ranking is recomputed on each full KPI batch completion (typically weekly). Rank delta vs. previous period is displayed prominently.
-
-#### International Ranking Predictor
-
-A secondary computed score maps UCAR KPIs to the exact QS indicator definitions and outputs a **predicted QS band** (e.g., "501–600") using a regression model trained on historical QS data for comparable institutions. This is a **prediction, not a guarantee** and is labeled accordingly.
-
-```
-predicted_qs_score = f(RES-01, ACA-01, EMP-01, EMP-02, INT-01, INT-02, INT-04, ESG-*)
-```
-
-Model: Ridge regression with SHAP explainability. Retrained annually when new QS data is published.
 
 ---
 
@@ -387,11 +364,11 @@ Model: Ridge regression with SHAP explainability. Retrained annually when new QS
 
 **1. University President View** (cross-institution)
 
-- Ranked leaderboard of all 35 institutions by UCAR Score
-- Domain radar charts: each institution's 8-domain profile
+- Ranked leaderboard of all 35 institutions by internal UCAR Score
+- Domain radar charts: each institution's 8-domain KPI profile
 - UCAR network aggregate score vs. last period
-- Predicted QS band for UCAR as a network
 - Top 5 anomalies (institutions with largest negative KPI deltas)
+- **Accreditation Posture Panel**: for each active target framework, show network-level control coverage (N passing / M total) with a progress bar — clicking through opens the Accreditation Dashboard
 - Drill-down: click any institution → Dean View
 
 **2. Dean View** (single institution)
@@ -402,23 +379,25 @@ Model: Ridge regression with SHAP explainability. Retrained annually when new QS
 - Comparison panel: institution vs. UCAR median vs. UCAR best
 - Alert feed (institution-specific)
 - Missing document warnings (feeds from doc-service)
+- **Accreditation tab**: per-framework control pass rate + top failing controls
 
-**3. KPI Detail View**
+**3. Accreditation Dashboard** (full view — see `.claude/accreditation.md` for complete spec)
+
+- Framework tabs: QS | THE | ARWU | ISO 21001 | MESRS
+- Per framework: progress ring (% controls passing), control list with status badges, evidence portfolio, gap analysis sorted by weight × distance to passing
+- Evidence Portfolio: all documents on file that are linked to at least one control in this framework, with their template type, upload date, and approval status
+
+**4. KPI Detail View**
 
 - Full time-series for one KPI
 - Data lineage: which documents contributed to this value
 - Last computation timestamp + source institution data
-- SHAP contribution breakdown (for AI-derived metrics)
-
-**4. Ranking Simulation View** (President only)
-
-- Adjust hypothetical KPI values → see predicted UCAR Score impact
-- "What-if" slider for each domain weight
+- Which framework controls this KPI feeds, with their current pass/fail status
 
 #### Technical requirements
 
 - All charts use Recharts with server-side aggregated data (no raw data to client)
-- KPI cards refresh every 5 minutes via WebSocket subscription
+- KPI cards subscribe via WebSocket and update when a new `kpi_records` row is written for their KPI — they do not poll on a 5-minute timer. Annual KPIs display their last computed value with a "last updated" timestamp; they do not re-render until a new computation is triggered.
 - All views must render on screens as small as 1024px wide
 - Export to PDF and Excel available on every view (server-side rendered)
 
@@ -564,7 +543,7 @@ A Document Template defines:
 6. Flagged documents queued for human correction
 7. On approval, records are committed and KPIs recomputed
 
-#### Stage 5: Storage
+#### Stage 5: Storage & Post-Approval Events
 
 ```
 Each extracted record stored as:
@@ -573,6 +552,25 @@ Each extracted record stored as:
   - Full text → Elasticsearch index `docs-{tenant}`
   - Extraction metadata → `documents.ingestion_log` (confidence, strategy, reviewer)
 ```
+
+On document approval (status transitions to `approved`), `doc-service` publishes a Redis pub/sub event to channel `events.document.approved`:
+
+```json
+{
+  "event": "document.approved",
+  "tenant_id": "<uuid>",
+  "document_id": "<uuid>",
+  "template_id": "<uuid>",
+  "document_class": "<string>",
+  "approved_at": "<iso8601>"
+}
+```
+
+Consumers:
+- `kpi-service` — triggers KPI recomputation for all KPI IDs in `kpi_definitions.data_sources` that include this `document_class`
+- `accreditation-service` — triggers control re-evaluation for all tests linked to this `template_id` via `template_test_links`
+
+If a document is later **rejected** (status → `rejected`), the same pattern fires on channel `events.document.rejected` with the same payload. Both services deactivate linked records (KPI records marked `is_estimated = true`; evidence records marked `is_active = false`) and re-evaluate downstream status.
 
 ### 5.4 Anomaly Detection in Documents
 
@@ -634,6 +632,7 @@ CREATE TABLE professors (
   last_name_ar    VARCHAR(100),
   email           VARCHAR(255) UNIQUE NOT NULL,
   phone           VARCHAR(30),
+  gender          VARCHAR(10) CHECK (gender IN ('M', 'F', 'other', 'undisclosed')),  -- required for ESG-07
   contract_type   VARCHAR(20) NOT NULL CHECK (contract_type IN ('permanent', 'contractual')),
   rank            VARCHAR(50),       -- Maître assistant A/B, Maître de conférences, Professeur
   position_status VARCHAR(20),       -- active, on_leave, suspended, retired
@@ -642,6 +641,8 @@ CREATE TABLE professors (
   max_hours       INTEGER,           -- overwork threshold
   base_salary     NUMERIC(12,3),
   photo_url       TEXT,
+  h_index         INTEGER,           -- stored after Scopus sync or manual entry; used for RES-02
+  h_index_updated_at TIMESTAMPTZ,   -- when h_index was last synced
   created_at      TIMESTAMPTZ DEFAULT NOW(),
   updated_at      TIMESTAMPTZ DEFAULT NOW()
 );
@@ -686,7 +687,6 @@ CREATE TABLE professor_publications (
   doi             VARCHAR(200),
   scopus_id       VARCHAR(100),
   citation_count  INTEGER DEFAULT 0,
-  h_index_contrib BOOLEAN DEFAULT false,
   source          VARCHAR(30) CHECK (source IN ('manual', 'scopus_api', 'doc_extract'))
 );
 
@@ -1024,14 +1024,19 @@ These features are explicitly lower priority but architecturally compatible with
 
 Implementation: Celery beat scheduler → `report-service` → Garage storage → email dispatch.
 
-### 9.2 Predicted International Ranking
+### 9.2 Framework Gap Analysis Report
 
-- **Model**: Ridge regression trained on historical QS data for comparable MENA institutions
-- **Inputs**: QS-mappable KPIs from the catalog (RES-01, ACA-01, EMP-01, EMP-02, INT-01, INT-02, RES-04, ESG composite)
-- **Outputs**: Predicted QS band (e.g., "801-1000"), THE band, confidence interval
-- **Display**: Separate "Ranking Intelligence" panel on President dashboard
-- **Explainability**: "To move from 801-1000 to 701-800, focus on: Citations per Faculty (+35%), International Faculty Ratio (+8%)"
-- **Update frequency**: On new QS data publication (annual); UCAR KPI inputs refresh weekly
+An on-demand and scheduled report that answers: "For a given accreditation target, what are the highest-priority gaps, and what actions would close them?"
+
+- **Input**: Select framework (QS, THE, ISO 21001, MESRS) + scope (single institution or UCAR network)
+- **Output**: Ranked gap list
+  - Each gap = one control that is FAILING or NEEDS_EVIDENCE
+  - For each gap: current value, target threshold, delta, specific missing evidence (documents or KPI data), estimated effort category (Low / Medium / High)
+  - Sorted by: weight in framework × distance from threshold (highest-impact gaps first)
+- **Display**: Framework Gap Analysis panel on President and Dean dashboards
+- **Explainability**: "Citations per Faculty (QS weight 20%): current 2.3, threshold 5.0 — requires approved publication lists for 2023–2025 from 12 institutions currently missing data"
+- **Update frequency**: Recomputed on each KPI batch completion and on each new document approval
+- **Export**: PDF gap report in MESRS-compatible format, suitable for board presentation
 
 ### 9.3 Document Anomaly Detection
 
@@ -1081,6 +1086,12 @@ Response generator (Claude API)
 
 ## 10. Data Models
 
+### 10.0 Accreditation Tables
+
+Core entities: `frameworks`, `framework_controls`, `control_tests` (automated / document-upload / attestation), `control_evidence` (links approved documents and KPI records to tests), `control_status` (live pass/fail per institution per control). Document templates carry `linked_test_ids[]` so that any approved document of that template type auto-satisfies the mapped tests.
+
+Full schema: see `.claude/accreditation.md`.
+
 ### 10.1 Core Tables (Shared Schema: `ucar_global`)
 
 ```sql
@@ -1124,18 +1135,22 @@ CREATE TABLE kpi_weight_versions (
 );
 
 -- KPI records (computed values per institution per period)
+-- Converted to TimescaleDB hypertable on computed_at after creation:
+--   SELECT create_hypertable('kpi_records', 'computed_at', chunk_time_interval => INTERVAL '3 months');
 CREATE TABLE kpi_records (
-  id              UUID PRIMARY KEY,
+  id              UUID NOT NULL,
   tenant_id       UUID REFERENCES tenants(id),
   kpi_id          VARCHAR(10) REFERENCES kpi_definitions(kpi_id),
   value           NUMERIC(15,4),
   normalized_score NUMERIC(5,2),   -- 0-100
   period_start    DATE,
   period_end      DATE,
-  computed_at     TIMESTAMPTZ,
-  source_doc_ids  UUID[],          -- traceability
-  computation_log JSONB,           -- intermediate values for audit
-  is_estimated    BOOLEAN DEFAULT false  -- true if imputed from incomplete data
+  computed_at     TIMESTAMPTZ NOT NULL,  -- hypertable partition key
+  source_doc_ids  UUID[],          -- traceability: which documents were inputs
+  source_field_refs JSONB,         -- {doc_id: [field_names_used]} — granular lineage
+  computation_log JSONB,           -- intermediate values for audit (required, not nullable)
+  is_estimated    BOOLEAN DEFAULT false,  -- true if imputed from incomplete data
+  PRIMARY KEY (id, computed_at)
 );
 
 -- UCAR Composite Scores
@@ -1148,7 +1163,6 @@ CREATE TABLE institution_scores (
   rank            INTEGER,
   rank_delta      INTEGER,         -- vs previous period
   domain_scores   JSONB,          -- {RESEARCH: 72.3, ACADEMIC: 68.1, ...}
-  predicted_qs_band VARCHAR(30),
   computed_at     TIMESTAMPTZ
 );
 
@@ -1169,6 +1183,7 @@ CREATE TABLE alerts (
   is_resolved     BOOLEAN DEFAULT false,
   resolved_at     TIMESTAMPTZ,
   resolved_by     UUID,
+  resolution_notes TEXT,
   created_at      TIMESTAMPTZ DEFAULT NOW()
 );
 ```
@@ -1448,7 +1463,7 @@ _Goal: full KPI computation, ranking, dashboard complete_
 - [ ] TimescaleDB integration for time-series
 - [ ] Institution ranking + composite score
 - [ ] Comparative views (institution vs. network)
-- [ ] International ranking predictor (regression model)
+- [ ] Accreditation compliance engine + dashboard (framework controls, test evaluation, evidence portfolio)
 - [ ] President + Dean + KPI detail views complete
 - [ ] PDF/Excel export for all views
 
@@ -1502,14 +1517,21 @@ _Goal: production-ready at scale_
 | Q5  | Budget for cloud infrastructure vs. on-premise?                                   | Deployment topology                | UCAR Admin           |
 | Q6  | Are employer surveys to be conducted by UCAR or sourced from QS directly?         | EMP-01, EMP-02                     | External Relations   |
 | Q7  | Legal basis for storing professor personal data (Tunisian Law 63-2004)?           | HR module compliance               | Legal counsel        |
+| Q8  | Which embedding model and vector store for professor specialization matching? (options: pgvector extension on existing PostgreSQL, or separate service) | HR-09, professor matching engine | Engineering |
+| Q9  | How is attendance tracked for ACA-11 and HR-06 (monthly)? Is there an existing attendance system or is it document-upload only? | ACA-11, HR-06 computation feasibility | UCAR IT |
+| Q10 | Is there a consultancy/knowledge transfer revenue line in budget reports, or does RES-10 require a separate document template? | RES-10 data source | Finance |
+| Q11 | MESRS: which specific ministerial circulars define mandatory annual document submissions? | MESRS framework completeness | UCAR Legal / Admin |
+| Q12 | Should NCR (Non-Conformance Records) for GOV-02 be entered directly in the platform or extracted from uploaded audit_report documents? | GOV-02 data pipeline | Quality / ISO team |
+| Q13 | Offline mode: does the 24h cache need to support mobile (React Native) or only web? What is the sync protocol on reconnect? | Offline mode implementation scope | Engineering |
 
 ### Known Constraints
 
-- **Network reliability**: Some UCAR campuses (Bizerte, Nabeul) have inconsistent connectivity. Read-only offline mode with 24h KPI cache is mandatory.
+- **Network reliability**: Some UCAR campuses (Bizerte, Nabeul) have inconsistent connectivity. Read-only offline mode with 24h KPI cache is mandatory. Cache covers computed KPI values and last-evaluated control statuses only — document upload and attestation submission require connectivity.
 - **Arabic OCR quality**: Tesseract Arabic accuracy degrades on handwritten text. GPT-4o vision fallback adds latency and cost. Budget allocation needed.
-- **QS Academic Reputation (40% weight)**: Cannot be computed internally — requires global academic survey. The platform tracks the _other_ 60% of QS indicators and flags reputation as "survey-based, tracked externally."
-- **Data maturity lag**: Year 1 KPIs will be partially computed (missing data from non-digitalized documents). System must handle partial computation gracefully with confidence intervals, not zero values.
+- **QS Academic Reputation and Employer Reputation**: These controls (30% + 15% of QS) require the institution to upload the official QS survey result document they receive. The platform cannot generate these values — it can only record them. They remain NEEDS_EVIDENCE until uploaded.
+- **Data maturity lag**: Year 1 KPIs will be partially computed (missing data from non-digitalized documents). System must handle partial computation gracefully with `is_estimated = true`, not zero values.
 - **Gale-Shapley output is advisory**: Ministry retains final authority on permanent professor assignments. Platform generates recommendation; human override with mandatory audit log.
+- **QS weights version-locked**: Weights in `accreditation.md` reflect QS 2024 methodology. QS updates its methodology periodically — the `frameworks.version` field must be updated and weights re-seeded when QS publishes a new methodology.
 
 ### Spec Documents To Be Written
 
@@ -1520,12 +1542,12 @@ Each of the following will be a separate `specs/{service}.md` file with: data mo
 - [ ] `specs/hr-service.md`
 - [ ] `specs/project-service.md`
 - [ ] `specs/alert-service.md`
+- [ ] `specs/accreditation-service.md`
 - [ ] `specs/nlp-service.md`
 - [ ] `specs/report-service.md`
 - [ ] `specs/auth-service.md`
 - [ ] `specs/admin-service.md`
 - [ ] `specs/frontend.md`
-- [ ] `specs/ml-models.md`
 - [ ] `specs/migration-playbook.md`
 
 ---
