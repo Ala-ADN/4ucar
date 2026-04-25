@@ -1,7 +1,97 @@
 [project]
 name = "4ucar"
 version = "0.1.0"
-description = "Add your description here"
+description = "UCAR Intelligent University ERP — backend monorepo"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+
+dependencies = [
+    # --- Web framework ---
+    "fastapi",
+    "uvicorn[standard]",
+    "python-multipart",
+    "httpx",
+
+    # --- Settings & validation ---
+    "pydantic",
+    "pydantic-settings",
+
+    # --- Database ---
+    "sqlalchemy",
+    "asyncpg",
+    "psycopg[binary]",
+    "alembic",
+
+    # --- Cache / queue / pubsub ---
+    "redis",
+    "celery",
+
+    # --- Object storage & search ---
+    "minio",
+    "elasticsearch",
+
+    # --- Auth ---
+    "python-jose[cryptography]",
+    "passlib[bcrypt]",
+    "python-keycloak",
+
+    # --- Document ingestion / OCR ---
+    "pytesseract",
+    "pymupdf",
+    "openpyxl",
+    "pandas",
+    "tabula-py",
+    "python-docx",
+
+    # --- ML / NLP ---
+    "scikit-learn",
+    "numpy",
+    "shap",
+    "sentence-transformers",
+    "anthropic",
+
+    # --- Report generation ---
+    "weasyprint",
+    "jinja2",
+
+    # --- Observability ---
+    "structlog",
+    "prometheus-fastapi-instrumentator",
+    "sentry-sdk",
+
+    # --- Resilience / utilities ---
+    "tenacity",
+    "email-validator",
+    "babel",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "pytest-cov",
+    "pytest-mock",
+    "ruff",
+    "mypy",
+    "pre-commit",
+    "types-passlib",
+    "types-python-jose",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["backend"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "N", "ASYNC"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
