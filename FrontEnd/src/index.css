@@ -1,0 +1,48 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+:root {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "DM Serif Display", Georgia, serif;
+
+  --color-off-white: #F8FAFC; /* slate-50 */
+  --color-surface: #FFFFFF;
+  --color-surface-hover: #F1F5F9; /* slate-100 */
+  --color-border: #E2E8F0; /* slate-200 */
+  --color-border-strong: #CBD5E1; /* slate-300 */
+
+  --color-blue-50: #EFF6FF;
+  --color-blue-100: #DBEAFE;
+  --color-blue-200: #BFDBFE;
+  --color-blue-500: #3B82F6;
+  --color-blue-600: #2563EB;
+  --color-blue-700: #1D4ED8;
+  --color-blue-900: #0F172A; /* slate-900 */
+
+  --status-critical: #EF4444;
+  --status-high: #F97316;
+  --status-medium: #EAB308;
+  --status-good: #16A34A; /* green-600 */
+  --status-info: #2563EB; /* blue-600 */
+
+  --shadow-card: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1); /* shadow-sm */
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+}
+
+@layer base {
+  body {
+    background-color: var(--color-off-white);
+    color: var(--color-blue-900);
+    font-family: var(--font-sans);
+  }
+}
+
+.font-tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+.map-bg {
+  background-image: radial-gradient(circle, #CBD5E1 1px, transparent 1px);
+  background-size: 24px 24px;
+}
