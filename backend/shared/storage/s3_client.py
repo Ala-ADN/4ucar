@@ -1,7 +1,7 @@
-"""MinIO/S3 client: per-tenant bucket, pre-signed URLs (15 min TTL)."""
+"""S3 client (Garage backend): per-tenant bucket, pre-signed URLs (15 min TTL)."""
 
 
-def get_minio_client():
+def get_s3_client():
     raise NotImplementedError
 
 
