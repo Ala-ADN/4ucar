@@ -1,0 +1,37 @@
+import React from 'react';
+import { cn } from "@/src/lib/utils";
+import { HealthStatus } from "@/src/types";
+
+export function StatusDot({ status, animate = false }: { status: HealthStatus, animate?: boolean }) {
+  const colors = {
+    good: "bg-status-good",
+    warning: "bg-status-medium",
+    critical: "bg-status-critical"
+  };
+
+  return (
+    <div className="relative flex items-center justify-center">
+      {animate && status === 'critical' && (
+        <span className="absolute inline-flex h-full w-full rounded-full bg-status-critical opacity-75 animate-ping"></span>
+      )}
+      <div className={cn("w-2.5 h-2.5 rounded-full", colors[status])} />
+    </div>
+  );
+}
+
+export function Badge({ children, variant = "info" }: { children: React.ReactNode, variant?: HealthStatus | "info" | "purple" | "amber" }) {
+  const styles: Record<string, string> = {
+    info: "bg-blue-50 text-blue-700",
+    good: "bg-status-good-bg text-status-good",
+    warning: "bg-status-medium-bg text-status-medium",
+    critical: "bg-status-critical-bg text-status-critical",
+    purple: "bg-purple-100 text-purple-700",
+    amber: "bg-amber-100 text-amber-700"
+  };
+
+  return (
+    <span className={cn("px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider", styles[variant])}>
+      {children}
+    </span>
+  );
+}
