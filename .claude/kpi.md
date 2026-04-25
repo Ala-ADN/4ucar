@@ -1,5 +1,0 @@
-# kpis
-
--
-
-# dashboard

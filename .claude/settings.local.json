@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(.venv/Scripts/python.exe -m py_compile backend/integrations/openalex.py scripts/demo_domain_a_insat.py tests/unit/test_openalex_mapper.py)",
+      "Bash(.venv/Scripts/python.exe scripts/demo_domain_a_insat.py --period 2026)"
+    ]
+  }
+}

@@ -1,4 +1,4 @@
-"""Generates scheduled and on-demand reports; stores in MinIO; dispatches email."""
+"""Generates scheduled and on-demand reports; stores in Garage; dispatches email."""
 
 
 def generate_report(report_request_id):

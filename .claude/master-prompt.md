@@ -90,7 +90,7 @@ The University of Carthage (UCAR) oversees 35 affiliated institutions operating 
 ┌──▼────────▼─────────▼──────────▼─────────▼──────────▼──────────┐
 │                      Shared Data Layer                          │
 │  PostgreSQL (multi-schema tenancy)  ·  Redis (cache/queue)     │
-│  MinIO / S3 (document store)  ·  TimescaleDB (KPI time-series) │
+│  Garage / S3 (document store)  ·  TimescaleDB (KPI time-series)│
 │  Elasticsearch (full-text + NLP index)                         │
 └─────────────────────────────────────────────────────────────────┘
                             │
@@ -115,7 +115,7 @@ The University of Carthage (UCAR) oversees 35 affiliated institutions operating 
 | Background Jobs    | Celery + Redis                                        | Scheduled ingestion, report generation                |
 | Primary DB         | PostgreSQL 16 (schema-per-tenant)                     | ACID, row-level security, proven multi-tenancy        |
 | Time-series        | TimescaleDB extension                                 | KPI trend queries; hypertable partitioning            |
-| Document Store     | MinIO (S3-compatible)                                 | Self-hosted, no vendor lock; presigned URLs           |
+| Document Store     | Garage (S3-compatible)                                | Self-hosted, no vendor lock; presigned URLs           |
 | Search / NLP index | Elasticsearch 8                                       | Full-text over extracted docs; vector search          |
 | Cache              | Redis 7                                               | KPI cache, session, pub/sub for alerts                |
 | AI OCR             | Tesseract 5 + GPT-4o vision for correction            | Cost-effective; LLM handles ambiguous scans           |
@@ -132,7 +132,7 @@ Each institution is a **tenant**. Tenancy is enforced at three levels:
 
 1. **Database**: Separate PostgreSQL schema per tenant (`tenant_{institution_code}`). Shared schema for UCAR-level aggregates (`ucar_global`).
 2. **Application**: Every API handler extracts `tenant_id` from the authenticated JWT and injects it into all queries. No cross-tenant query is possible without the `GLOBAL_READ` permission.
-3. **Storage**: MinIO bucket per tenant (`docs-{institution_code}`). Pre-signed URLs are scoped and expire after 15 minutes.
+3. **Storage**: Garage bucket per tenant (`docs-{institution_code}`). Pre-signed URLs are scoped and expire after 15 minutes.
 
 ---
 
@@ -141,7 +141,7 @@ Each institution is a **tenant**. Tenancy is enforced at three levels:
 | Service           | Responsibilities                                                | Key Dependencies                                | Spec Document              |
 | ----------------- | --------------------------------------------------------------- | ----------------------------------------------- | -------------------------- |
 | `kpi-service`     | KPI computation, ranking, score aggregation, trend storage      | PostgreSQL, TimescaleDB, Redis                  | `specs/kpi-service.md`     |
-| `doc-service`     | File upload, OCR, extraction, classification, template matching | MinIO, Elasticsearch, OCR engine                | `specs/doc-service.md`     |
+| `doc-service`     | File upload, OCR, extraction, classification, template matching | Garage, Elasticsearch, OCR engine               | `specs/doc-service.md`     |
 | `hr-service`      | Professor profiles, workload, hiring workflows, matching        | PostgreSQL, `kpi-service`                       | `specs/hr-service.md`      |
 | `project-service` | Project posting, KPI-based matching, assignment tracking        | PostgreSQL, `kpi-service`, `hr-service`         | `specs/project-service.md` |
 | `alert-service`   | Threshold monitoring, anomaly detection, notification dispatch  | Redis pub/sub, `kpi-service`, email/SMS gateway | `specs/alert-service.md`   |
@@ -568,7 +568,7 @@ A Document Template defines:
 
 ```
 Each extracted record stored as:
-  - Raw file → MinIO bucket (immutable, versioned)
+  - Raw file → Garage bucket (immutable, versioned)
   - Extracted JSON → PostgreSQL table `documents.extracted_records`
   - Full text → Elasticsearch index `docs-{tenant}`
   - Extraction metadata → `documents.ingestion_log` (confidence, strategy, reviewer)
@@ -606,7 +606,7 @@ doc-service/
 │   ├── validator.py        # Schema + range + duplicate checks
 │   └── anomaly.py          # Post-extraction anomaly detection
 ├── storage/
-│   ├── minio_client.py     # Raw file storage
+│   ├── s3_client.py        # Raw file storage (Garage)
 │   ├── pg_client.py        # Extracted record persistence
 │   └── es_client.py        # Full-text indexing
 └── workers/
@@ -663,7 +663,7 @@ CREATE TABLE professor_degrees (
   institution     VARCHAR(200),
   country         VARCHAR(100),
   year            INTEGER,
-  document_url    TEXT               -- link to uploaded diploma in MinIO
+  document_url    TEXT               -- link to uploaded diploma in Garage
 );
 
 CREATE TABLE professor_positions (
@@ -1022,7 +1022,7 @@ These features are explicitly lower priority but architecturally compatible with
 - **Annual ranking report**: Full UCAR network analysis. Predicted QS/THE bands. Trend analysis. Board-ready format.
 - **On-demand**: Any dashboard view exportable to PDF in one click (server-side rendering via Puppeteer/WeasyPrint).
 
-Implementation: Celery beat scheduler → `report-service` → MinIO storage → email dispatch.
+Implementation: Celery beat scheduler → `report-service` → Garage storage → email dispatch.
 
 ### 9.2 Predicted International Ranking
 
@@ -1180,7 +1180,7 @@ CREATE TABLE documents.files (
   id              UUID PRIMARY KEY,
   tenant_id       UUID REFERENCES ucar_global.tenants(id),
   original_name   TEXT NOT NULL,
-  storage_path    TEXT NOT NULL,   -- MinIO path
+  storage_path    TEXT NOT NULL,   -- S3 key in Garage bucket
   mime_type       VARCHAR(100),
   file_size_bytes BIGINT,
   document_class  VARCHAR(50),
@@ -1248,7 +1248,7 @@ Tenant scoping: Injected from JWT claims. Cross-tenant requests require `X-Globa
   POST /documents/upload              → Upload file (multipart)
   GET  /documents/                    → List documents for tenant
   GET  /documents/{id}                → Document metadata
-  GET  /documents/{id}/download       → Pre-signed MinIO URL
+  GET  /documents/{id}/download       → Pre-signed Garage URL
   GET  /documents/review/queue        → Pending human review items
   POST /documents/review/{id}/approve → Approve extraction result
   POST /documents/review/{id}/reject  → Reject + annotate
@@ -1395,7 +1395,7 @@ services:
   beat: # Celery beat scheduler
   postgres: # PostgreSQL + TimescaleDB
   redis: # Redis
-  minio: # MinIO object store
+  garage: # Garage object store (S3-compatible)
   elasticsearch: # Elasticsearch
   frontend: # React dev server
   grafana: # Observability
@@ -1406,7 +1406,7 @@ services:
 
 - Each service: Deployment + HorizontalPodAutoscaler (min 2, max 10 replicas)
 - PostgreSQL: Managed instance (e.g., AWS RDS / Azure Database) or Crunchy Data PGO on K8s
-- MinIO: StatefulSet or managed object storage
+- Garage: StatefulSet (3+ nodes for replication) or managed object storage
 - Elasticsearch: ECK operator
 - Secrets: Kubernetes Secrets + external secrets manager (Vault or AWS Secrets Manager)
 - Ingress: nginx ingress controller with TLS termination
@@ -1422,7 +1422,7 @@ _Goal: auth, tenant management, first KPI ingestion, document upload_
 
 - [ ] Auth service: JWT, RBAC, Keycloak integration
 - [ ] Tenant provisioning: admin UI to create institutions
-- [ ] Document upload: MinIO integration, format normalizer, basic classifier
+- [ ] Document upload: Garage integration, format normalizer, basic classifier
 - [ ] KPI definitions loaded: all KPI catalog entries seeded
 - [ ] Manual KPI entry: admin can input KPI values directly (bootstrap before full pipeline)
 - [ ] Basic dashboard: KPI cards, no time-series yet
