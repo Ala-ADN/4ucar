@@ -1,1 +1,1 @@
-"""Object storage (MinIO/S3) and search index (Elasticsearch) clients."""
+"""Object storage (Garage/S3) and search index (Elasticsearch) clients."""

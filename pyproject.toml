@@ -27,7 +27,7 @@ dependencies = [
     "celery",
 
     # --- Object storage & search ---
-    "minio",
+    "boto3",
     "elasticsearch",
 
     # --- Auth ---
@@ -49,6 +49,7 @@ dependencies = [
     "shap",
     "sentence-transformers",
     "anthropic",
+    "scholarly",
 
     # --- Report generation ---
     "weasyprint",
