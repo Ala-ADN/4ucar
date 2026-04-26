@@ -1,6 +1,8 @@
 {
   "permissions": {
     "allow": [
+      "PowerShell(Restart-Service postgresql-x64-16 -ErrorAction Stop)",
+      "Bash(wsl -d Ubuntu-22.04 bash -c ' *)",
       "Bash(.venv/Scripts/python.exe -m py_compile backend/integrations/openalex.py scripts/demo_domain_a_insat.py tests/unit/test_openalex_mapper.py)",
       "Bash(.venv/Scripts/python.exe scripts/demo_domain_a_insat.py --period 2026)",
       "Bash(.venv/Scripts/python.exe -c ' *)",

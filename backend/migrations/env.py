@@ -7,10 +7,12 @@ so a single `DATABASE_URL` works for both.
 
 from __future__ import annotations
 
+import os
 from logging.config import fileConfig
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
+
 
 import backend.models  # noqa: F401  (registers tables on Base.metadata)
 from backend.shared.config import get_settings
@@ -20,6 +22,20 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
+# Import all model modules so their metadata is registered on Base
+from backend.shared.db.base import Base  # noqa: E402
+from backend.services.ingestion_service.models.import_record import (  # noqa: F401, E402
+    ImportRecord, DataRecord, QuarantineRow, DataRequest,
+    DataRequestResponse, LockedPeriod,
+)
+from backend.services.ingestion_service.models.audit import AuditEntry  # noqa: F401, E402
+
+target_metadata = Base.metadata
+
+# Override sqlalchemy.url from environment if set
+db_url = os.environ.get("ALEMBIC_DB_URL") or os.environ.get("DATABASE_URL")
+if db_url:
+    config.set_main_option("sqlalchemy.url", db_url)
 
 def _sync_database_url() -> str:
     url = get_settings().database_url
