@@ -6,6 +6,69 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { Link } from 'react-router-dom';
 import { cn } from '@/src/lib/utils';
 
+function IPGGauge({ value }: { value: number }) {
+  const size = 110;
+  const strokeWidth = 8;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const pct = value / 100;
+  const offset = circumference - pct * circumference;
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-lg p-5 flex flex-col justify-between">
+      <div className="flex justify-between items-start mb-4">
+        <div>
+          <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-tight">Indice de Perf. Global (IPG)</h3>
+          <p className="text-[10px] text-slate-400 mt-1 leading-tight max-w-[180px]">
+            Moy. pondérée : Académique (40%), Finance (30%), RH (30%).
+          </p>
+        </div>
+        <Badge variant="good">+0.4%</Badge>
+      </div>
+      <div className="flex items-center gap-6">
+        <div className="relative" style={{ width: size, height: size }}>
+          <svg width={size} height={size} className="-rotate-90">
+            <circle
+              cx={size / 2}
+              cy={size / 2}
+              r={radius}
+              fill="none"
+              stroke="#F1F5F9"
+              strokeWidth={strokeWidth}
+            />
+            <circle
+              cx={size / 2}
+              cy={size / 2}
+              r={radius}
+              fill="none"
+              stroke="#1B4F8B"
+              strokeWidth={strokeWidth}
+              strokeDasharray={circumference}
+              strokeDashoffset={offset}
+              strokeLinecap="round"
+              className="transition-all duration-1000 ease-out"
+            />
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <span className="text-3xl font-bold text-[#0F172A] tabular-nums tracking-tighter leading-none">{Math.round(value)}</span>
+            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mt-0.5">/ 100</span>
+          </div>
+        </div>
+        <div className="flex flex-col gap-2 flex-1">
+          <div className="flex justify-between items-center text-xs">
+            <span className="text-slate-500">Objectif S1:</span>
+            <span className="font-semibold text-slate-700">80</span>
+          </div>
+          <div className="flex justify-between items-center text-xs">
+            <span className="text-slate-500">Réseau:</span>
+            <span className="font-semibold text-emerald-600">Conforme</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function Overview() {
   const medianUcarScore = Number(
     (institutions.reduce((sum, inst) => sum + inst.ucarScore, 0) / institutions.length).toFixed(1)
@@ -21,19 +84,14 @@ export function Overview() {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 items-stretch">
         <KPICard 
           label="Établissements surveillés" 
           value={TOTAL_INSTITUTIONS} 
           icon={School} 
           trend={{ value: 2, unit: '' }}
         />
-        <KPICard 
-          label="Score UCAR réseau" 
-          value={medianUcarScore} 
-          icon={CheckCircle2} 
-          trend={{ value: 0.4, unit: '%' }}
-        />
+        <IPGGauge value={medianUcarScore} />
         <KPICard 
           label="Alertes actives" 
           value={activeAlerts} 

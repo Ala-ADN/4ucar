@@ -12,6 +12,7 @@ import { Rankings } from './pages/Rankings';
 import { Alerts } from './pages/Alerts';
 import { Analytics } from './pages/Analytics';
 import { Finance } from './pages/Finance';
+import { Accreditations } from './pages/Accreditations';
 
 export default function App() {
   return (
@@ -25,6 +26,7 @@ export default function App() {
           <Route path="/alertes" element={<Alerts />} />
           <Route path="/reports" element={<Analytics />} />
           <Route path="/finance" element={<Finance />} />
+          <Route path="/accreditations" element={<Accreditations />} />
         </Route>
       </Routes>
     </BrowserRouter>
