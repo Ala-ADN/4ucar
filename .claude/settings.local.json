@@ -4,7 +4,10 @@
       "Bash(.venv/Scripts/python.exe -m py_compile backend/integrations/openalex.py scripts/demo_domain_a_insat.py tests/unit/test_openalex_mapper.py)",
       "Bash(.venv/Scripts/python.exe scripts/demo_domain_a_insat.py --period 2026)",
       "Bash(.venv/Scripts/python.exe -c ' *)",
-      "Bash(.venv/Scripts/python.exe -m py_compile backend/services/kpi_service/domain/result.py backend/services/kpi_service/domain/research.py backend/services/kpi_service/domain/academic.py backend/services/kpi_service/domain/employment.py backend/services/kpi_service/domain/international.py backend/services/kpi_service/domain/finance.py backend/services/kpi_service/domain/hr.py backend/services/kpi_service/domain/sustainability.py)"
+      "Bash(.venv/Scripts/python.exe -m py_compile backend/services/kpi_service/domain/result.py backend/services/kpi_service/domain/research.py backend/services/kpi_service/domain/academic.py backend/services/kpi_service/domain/employment.py backend/services/kpi_service/domain/international.py backend/services/kpi_service/domain/finance.py backend/services/kpi_service/domain/hr.py backend/services/kpi_service/domain/sustainability.py)",
+      "PowerShell(docker exec -e PGPASSWORD=ucar deploy-postgres-1 psql -h 127.0.0.1 -U ucar -d ucar -c \"\\\\dt\" 2>&1)",
+      "Bash(python -m scripts.seed_insat_dgim_dgpi)",
+      "*"
     ]
   }
 }

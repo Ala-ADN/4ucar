@@ -1,22 +1,63 @@
-"""Alembic environment — pulls metadata from backend.models."""
+"""Alembic environment — pulls metadata from `backend.models`.
+
+Migrations run synchronously via psycopg even though the runtime uses
+asyncpg. We rewrite the `+asyncpg` driver suffix to `+psycopg` at startup
+so a single `DATABASE_URL` works for both.
+"""
+
+from __future__ import annotations
 
 from logging.config import fileConfig
 
 from alembic import context
+from sqlalchemy import engine_from_config, pool
+
+import backend.models  # noqa: F401  (registers tables on Base.metadata)
+from backend.shared.config import get_settings
+from backend.shared.db.base import Base
 
 config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-target_metadata = None
+
+def _sync_database_url() -> str:
+    url = get_settings().database_url
+    return url.replace("+asyncpg", "+psycopg")
+
+
+config.set_main_option("sqlalchemy.url", _sync_database_url())
+
+target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
-    raise NotImplementedError
+    context.configure(
+        url=config.get_main_option("sqlalchemy.url"),
+        target_metadata=target_metadata,
+        literal_binds=True,
+        compare_type=True,
+        dialect_opts={"paramstyle": "named"},
+    )
+    with context.begin_transaction():
+        context.run_migrations()
 
 
 def run_migrations_online() -> None:
-    raise NotImplementedError
+    connectable = engine_from_config(
+        config.get_section(config.config_ini_section, {}),
+        prefix="sqlalchemy.",
+        poolclass=pool.NullPool,
+        future=True,
+    )
+    with connectable.connect() as connection:
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            compare_type=True,
+        )
+        with context.begin_transaction():
+            context.run_migrations()
 
 
 if context.is_offline_mode():
