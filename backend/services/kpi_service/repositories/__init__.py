@@ -1,1 +1,5 @@
-"""Persistence — kpi_records, institution_scores, kpi_weight_versions."""
+"""Persistence layer for the KPI service."""
+
+from .kpi_record import KpiRecordRepository
+
+__all__ = ["KpiRecordRepository"]

@@ -22,14 +22,9 @@ from .inputs import (
     five_year_window,
     total_active_fte,
 )
-from .result import KpiResult
+from .result import KpiResult, build_kpi_result
 
 DOMAIN = "RESEARCH"
-
-
-# ---------------------------------------------------------------------------
-# helpers
-# ---------------------------------------------------------------------------
 
 
 def _pubs_in_window(inputs: InstitutionResearchInputs) -> list[Publication]:
@@ -43,32 +38,8 @@ def _pubs_in_window(inputs: InstitutionResearchInputs) -> list[Publication]:
     ]
 
 
-def _result(
-    *,
-    kpi_id: str,
-    name: str,
-    formula: str,
-    unit: str,
-    inputs: InstitutionResearchInputs,
-    value: float | None,
-    missing: list[str],
-    warnings: list[str],
-    used: dict,
-) -> KpiResult:
-    return KpiResult(
-        kpi_id=kpi_id,
-        name=name,
-        domain=DOMAIN,
-        formula=formula,
-        period_start=inputs.period_start,
-        period_end=inputs.period_end,
-        unit=unit,
-        value=value,
-        is_complete=(value is not None and not missing and not warnings),
-        missing_fields=missing,
-        warnings=warnings,
-        inputs_used=used,
-    )
+def _result(*, inputs: InstitutionResearchInputs, **kw) -> KpiResult:
+    return build_kpi_result(inputs, DOMAIN, **kw)
 
 
 # ---------------------------------------------------------------------------

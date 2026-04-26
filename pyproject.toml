@@ -11,30 +11,24 @@ dependencies = [
     "uvicorn[standard]",
     "python-multipart",
     "httpx",
-
     # --- Settings & validation ---
     "pydantic",
     "pydantic-settings",
-
     # --- Database ---
     "sqlalchemy",
     "asyncpg",
     "psycopg[binary]",
     "alembic",
-
     # --- Cache / queue / pubsub ---
     "redis",
     "celery",
-
     # --- Object storage & search ---
     "boto3",
     "elasticsearch",
-
     # --- Auth ---
     "python-jose[cryptography]",
     "passlib[bcrypt]",
     "python-keycloak",
-
     # --- Document ingestion / OCR ---
     "pytesseract",
     "pymupdf",
@@ -42,7 +36,6 @@ dependencies = [
     "pandas",
     "tabula-py",
     "python-docx",
-
     # --- ML / NLP ---
     "scikit-learn",
     "numpy",
@@ -50,20 +43,18 @@ dependencies = [
     "sentence-transformers",
     "anthropic",
     "scholarly",
-
     # --- Report generation ---
     "weasyprint",
     "jinja2",
-
     # --- Observability ---
     "structlog",
     "prometheus-fastapi-instrumentator",
     "sentry-sdk",
-
     # --- Resilience / utilities ---
     "tenacity",
     "email-validator",
     "babel",
+    "pytest>=9.0.3",
 ]
 
 [project.optional-dependencies]
