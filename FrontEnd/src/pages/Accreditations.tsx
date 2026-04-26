@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useToast } from '@/src/components/ui/Toast';
 import {
   Search,
   ChevronDown,
@@ -137,6 +138,7 @@ export function Accreditations() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [domainFilter, setDomainFilter] = useState<string>('all');
   const [expandedControl, setExpandedControl] = useState<string | null>(null);
+  const { showToast } = useToast();
   
   // Local state for optimistic updates
   const [frameworks, setFrameworks] = useState<(typeof accreditationFrameworks)>(accreditationFrameworks);
@@ -168,9 +170,11 @@ export function Accreditations() {
   // Simulate Document Upload
   const handleSimulateUpload = () => {
     if (!uploadModalControl) return;
+    const controlCode = uploadModalControl.code;
+    const controlName = uploadModalControl.name;
     
     setFrameworks(prev => prev.map(fw => {
-      const idx = fw.controls.findIndex(c => c.code === uploadModalControl.code);
+      const idx = fw.controls.findIndex(c => c.code === controlCode);
       if (idx === -1) return fw;
       
       const newCtrls = [...fw.controls];
@@ -186,6 +190,7 @@ export function Accreditations() {
     }));
     
     setUploadModalControl(null);
+    showToast(`Preuve validée — ${controlCode} : ${controlName}`, 'success');
   };
 
   return (

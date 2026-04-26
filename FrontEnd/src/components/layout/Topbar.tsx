@@ -7,8 +7,8 @@ const pageTitles: Record<string, string> = {
   '/accreditations': 'Accréditations & Conformité',
   '/rankings': 'Classement UCAR',
   '/finance': 'Finances',
-  '/alertes': 'Alertes',
-  '/reports': 'Rapports'
+  '/alertes': 'Centre d\'Opérations',
+  '/reports': 'Rapports & Synthèses IA'
 };
 
 export function Topbar() {

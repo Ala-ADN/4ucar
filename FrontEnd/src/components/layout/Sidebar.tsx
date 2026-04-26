@@ -6,16 +6,19 @@ import {
   FileText,
   ChevronLeft,
   ChevronRight,
+  AlertCircle,
 } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useAppStore } from '@/src/store';
 import { cn } from '@/src/lib/utils';
+import logoSrc from '@/src/assets/logo-ucar.png';
 
 const navItems = [
   { icon: LayoutDashboard, label: 'Tableau de Bord', path: '/' },
   { icon: School, label: 'Carte du Réseau', path: '/institutions' },
   { icon: ShieldCheck, label: 'Accréditations', path: '/accreditations' },
   { icon: Wallet, label: 'Finances', path: '/finance' },
+  { icon: AlertCircle, label: 'Centre d\'Opérations', path: '/alertes' },
   { icon: FileText, label: 'Rapports', path: '/reports' },
 ];
 
@@ -30,22 +33,20 @@ export function Sidebar() {
       )}
     >
       {/* Brand */}
-      <div className={cn('h-16 flex items-center justify-between border-b border-white/10', sidebarCollapsed ? 'px-2' : 'px-5')}>
+      <div className="h-16 flex items-center justify-center border-b border-slate-200 bg-white px-4 m-5 rounded-lg">
         {!sidebarCollapsed && (
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-white/15 rounded-lg flex items-center justify-center backdrop-blur-sm">
-              <span className="text-white text-xs font-bold">UC</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-sm font-semibold text-white leading-tight">UCAR</span>
-              <span className="text-[10px] text-white/50 leading-tight">Carthage · HQ</span>
-            </div>
-          </div>
+          <img
+            src={logoSrc}
+            alt="Logo Université de Carthage"
+            className="h-11 w-auto object-contain"
+          />
         )}
         {sidebarCollapsed && (
-          <div className="w-8 h-8 bg-white/15 rounded-lg flex items-center justify-center mx-auto">
-            <span className="text-white text-xs font-bold">UC</span>
-          </div>
+          <img
+            src={logoSrc}
+            alt="Logo Université de Carthage"
+            className="h-8 w-auto object-contain"
+          />
         )}
       </div>
 
@@ -105,3 +106,4 @@ export function Sidebar() {
     </aside>
   );
 }
+
