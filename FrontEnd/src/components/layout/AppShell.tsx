@@ -1,30 +1,29 @@
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
-import { motion, AnimatePresence } from 'motion/react';
 import { useLocation } from 'react-router-dom';
 
 export function AppShell() {
   const location = useLocation();
 
   return (
-    <div className="flex min-h-screen bg-off-white">
-      <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0">
-        <Topbar />
-        <main className="flex-1">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={location.pathname}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12 }}
-              transition={{ duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] }}
-              className="p-10"
-            >
-              <Outlet />
-            </motion.div>
-          </AnimatePresence>
+    <div className="flex h-screen w-full bg-slate-50 overflow-hidden text-gray-900">
+      {/* Fixed Sidebar */}
+      <aside className="shrink-0 z-20">
+        <Sidebar />
+      </aside>
+
+      {/* Main Content Area */}
+      <div className="flex flex-col flex-1 min-w-0">
+        <header className="shrink-0 z-10">
+          <Topbar />
+        </header>
+
+        {/* Scrollable Content */}
+        <main className="flex-1 overflow-y-auto p-6 lg:p-8">
+          <div className="max-w-7xl mx-auto">
+            <Outlet key={location.pathname} />
+          </div>
         </main>
       </div>
     </div>

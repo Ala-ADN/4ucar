@@ -1,12 +1,11 @@
-import { motion, AnimatePresence } from 'motion/react';
-import { 
-  LayoutDashboard, 
-  School, 
-  Map as MapIcon, 
-  Bell, 
-  BarChart3, 
-  Trophy, 
-  Settings, 
+import {
+  LayoutDashboard,
+  School,
+  FileCheck,
+  Bell,
+  FileText,
+  Wallet,
+  Settings,
   User,
   ChevronLeft,
   ChevronRight
@@ -16,73 +15,66 @@ import { useAppStore } from '@/src/store';
 import { cn } from '@/src/lib/utils';
 
 const navItems = [
-  { icon: LayoutDashboard, label: 'Vue d\'ensemble', path: '/' },
-  { icon: School, label: 'Établissements', path: '/institutions' },
-  { icon: MapIcon, label: 'Carte interactive', path: '/carte' },
-  { icon: Bell, label: 'Alertes', path: '/alertes', badge: 8 },
-  { icon: BarChart3, label: 'Analytiques', path: '/analytiques' },
-  { icon: Trophy, label: 'Classements', path: '/classements' },
+  { icon: LayoutDashboard, label: 'Tableau KPI', path: '/' },
+  { icon: School, label: 'Etablissements', path: '/institutions' },
+  { icon: FileCheck, label: 'Conventions', path: '/conventions' },
+  { icon: Wallet, label: 'Finance', path: '/finance' },
+  { icon: Bell, label: 'Alertes & conformité', path: '/alertes', badge: 8 },
+  { icon: FileText, label: 'Rapports', path: '/reports' },
 ];
 
 export function Sidebar() {
   const { sidebarCollapsed, toggleSidebar } = useAppStore();
 
-  return (    <motion.aside
-      initial={false}
-      animate={{ width: sidebarCollapsed ? 60 : 240 }}
-      className="bg-[#0F172A] border-r border-slate-800 h-screen sticky top-0 flex flex-col flex-shrink-0 z-50 shadow-2xl shadow-black/50"
+  return (
+    <aside
+      className={cn(
+        'bg-slate-900 border-r border-slate-700 h-screen sticky top-0 flex flex-col shrink-0 z-50 transition-[width] duration-150',
+        sidebarCollapsed ? 'w-16' : 'w-64'
+      )}
     >
-      <div className="h-20 flex items-center justify-between px-6 border-b border-slate-800">
+      <div className={cn('h-16 flex items-center justify-between border-b border-slate-700', sidebarCollapsed ? 'px-2' : 'px-4')}>
         {!sidebarCollapsed && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="flex items-center gap-3"
-          >
-            <div className="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/20">
-              <div className="w-4 h-4 border-2 border-white rounded-sm"></div>
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-blue-700 rounded-md flex items-center justify-center">
+              <div className="w-3.5 h-3.5 border-2 border-white rounded-sm"></div>
             </div>
-            <span className="text-lg font-bold text-white tracking-tight">UCAR HQ</span>
-          </motion.div>
+            <span className="text-base font-semibold text-white">UCAR HQ</span>
+          </div>
         )}
         <button 
           onClick={toggleSidebar}
-          className="p-1.5 hover:bg-slate-800 rounded-md text-slate-400 transition-colors"
+          className="p-2 hover:bg-slate-800 rounded text-slate-300 transition-colors duration-150"
+          aria-label={sidebarCollapsed ? 'Developper la barre laterale' : 'Reduire la barre laterale'}
         >
           {sidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
         </button>
       </div>
 
-      <nav className="flex-1 py-6 overflow-y-auto overflow-x-hidden">
-        <ul className="space-y-1.5 px-4 text-slate-400">
+      <nav className="flex-1 py-4 overflow-y-auto overflow-x-hidden">
+        <ul className="space-y-1 px-2 text-slate-300">
           {navItems.map((item) => (
             <li key={item.path}>
               <NavLink
                 to={item.path}
                 className={({ isActive }) => cn(
-                  "flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group relative",
+                  'flex items-center gap-3 px-3 py-2 rounded-md transition-colors duration-150 group relative text-sm',
                   isActive 
-                    ? "bg-blue-600 text-white shadow-lg shadow-blue-500/10 font-semibold" 
-                    : "hover:bg-slate-800 hover:text-white font-medium"
+                    ? 'bg-blue-800 text-white font-semibold'
+                    : 'hover:bg-slate-800 hover:text-white font-medium'
                 )}
                 title={sidebarCollapsed ? item.label : undefined}
               >
                 {({ isActive }) => (
                   <>
-                    <item.icon size={18} className={cn(isActive ? "text-white" : "text-slate-500 group-hover:text-slate-300")} />
+                    <item.icon size={18} className={cn(isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-200')} />
                     {!sidebarCollapsed && (
-                      <motion.span
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        className="text-sm whitespace-nowrap"
-                      >
-                        {item.label}
-                      </motion.span>
+                      <span className="whitespace-nowrap">{item.label}</span>
                     )}
                     {item.badge && (
                       <span className={cn(
-                        "ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-md",
-                        isActive ? "bg-white/20 text-white" : "bg-blue-600 text-white"
+                        'ml-auto text-xs font-semibold px-1.5 py-0.5 rounded',
+                        isActive ? 'bg-white/20 text-white' : 'bg-slate-700 text-slate-100'
                       )}>
                         {item.badge}
                       </span>
@@ -94,22 +86,22 @@ export function Sidebar() {
           ))}
         </ul>
 
-        <div className="mt-10 px-4">
+        <div className="mt-8 px-2">
           {!sidebarCollapsed && (
-            <div className="px-4 mb-2 text-[10px] font-bold text-slate-500 uppercase tracking-[0.15em]">
+            <div className="px-3 mb-2 text-xs font-semibold text-slate-400 uppercase tracking-wide">
               Administration
             </div>
           )}
           <ul className="space-y-1.5">
             <li>
-              <button className="w-full flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors font-medium">
-                <Settings size={18} className="text-slate-500" />
+              <button className="w-full flex items-center gap-3 px-3 py-2 text-slate-300 hover:text-white hover:bg-slate-800 rounded-md transition-colors duration-150 font-medium text-sm">
+                <Settings size={18} className="text-slate-400" />
                 {!sidebarCollapsed && <span className="text-sm">Configuration</span>}
               </button>
             </li>
             <li>
-              <button className="w-full flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors font-medium">
-                <User size={18} className="text-slate-500" />
+              <button className="w-full flex items-center gap-3 px-3 py-2 text-slate-300 hover:text-white hover:bg-slate-800 rounded-md transition-colors duration-150 font-medium text-sm">
+                <User size={18} className="text-slate-400" />
                 {!sidebarCollapsed && <span className="text-sm">Mon compte</span>}
               </button>
             </li>
@@ -117,22 +109,22 @@ export function Sidebar() {
         </div>
       </nav>
 
-      <div className="p-4 border-t border-slate-800 m-2 mt-0">
+      <div className="p-3 border-t border-slate-700">
         <div className={cn(
-          "flex items-center gap-3 bg-slate-800/50 p-3 rounded-xl",
+          'flex items-center gap-3 bg-slate-800 p-2 rounded-md',
           sidebarCollapsed && "justify-center"
         )}>
-          <div className="w-9 h-9 rounded-full bg-slate-700 flex-shrink-0 flex items-center justify-center text-slate-300 font-bold text-xs ring-2 ring-slate-800">
+          <div className="w-8 h-8 rounded-full bg-slate-700 shrink-0 flex items-center justify-center text-slate-200 font-semibold text-xs">
             BS
           </div>
           {!sidebarCollapsed && (
             <div className="overflow-hidden">
-              <p className="text-xs font-bold text-white uppercase tracking-tight truncate">Dr. Ben Salah</p>
-              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter truncate">Lead Architect</p>
+              <p className="text-sm font-semibold text-white truncate">Dr. Ben Salah</p>
+              <p className="text-xs text-slate-400 truncate">Lead Architect</p>
             </div>
           )}
         </div>
       </div>
-    </motion.aside>
+    </aside>
   );
 }
