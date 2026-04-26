@@ -7,7 +7,7 @@ export function AppShell() {
   const location = useLocation();
 
   return (
-    <div className="flex h-screen w-full bg-slate-50 overflow-hidden text-gray-900">
+    <div className="app-atmosphere flex h-screen w-full overflow-hidden text-gray-900">
       {/* Fixed Sidebar */}
       <aside className="shrink-0 z-20">
         <Sidebar />

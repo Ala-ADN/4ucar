@@ -4,19 +4,16 @@ import {
   MapPin,
   Users,
   GraduationCap,
-  Wallet,
-  FlaskConical,
-  Building2,
+  Leaf,
+  ShieldCheck,
   UserRoundCheck,
   TrendingUp,
   TrendingDown,
-  FileText,
-  Trophy,
   AlertCircle,
 } from 'lucide-react';
-import { useState } from 'react';
-import { Institution, HealthStatus } from '@/src/types';
-import institutionsData from '@/src/data/institutions.json';
+import { useState, useMemo } from 'react';
+import { DashboardInstitution, HealthStatus } from '@/src/types';
+import { institutions, institutionKpiSeries, alerts as allAlerts } from '@/src/data/dashboardMock';
 import { Badge } from '@/src/components/ui/StatusDot';
 import { KPICard } from '@/src/components/kpi/KPICard';
 import { cn } from '@/src/lib/utils';
@@ -30,20 +27,20 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
+  RadarChart,
+  Radar,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
 } from 'recharts';
 
 const tabs = [
-  { id: 'academic', label: 'Academique', icon: GraduationCap },
-  { id: 'financial', label: 'Financier', icon: Wallet },
+  { id: 'academic', label: 'Académique', icon: GraduationCap },
+  { id: 'sustainability', label: 'Durabilité', icon: Leaf },
+  { id: 'governance', label: 'Gouvernance', icon: ShieldCheck },
   { id: 'hr', label: 'RH', icon: UserRoundCheck },
-  { id: 'research', label: 'Recherche', icon: FlaskConical },
-  { id: 'infra', label: 'Infrastructure', icon: Building2 },
+  { id: 'accreditation', label: 'Accréditation', icon: ShieldCheck },
 ] as const;
-
-const COLORS = ['#1d4ed8', '#334155', '#0f766e', '#b45309'];
 
 type TabId = (typeof tabs)[number]['id'];
 
@@ -51,11 +48,36 @@ export function InstitutionDetail() {
   const { code } = useParams();
   const [activeTab, setActiveTab] = useState<TabId>('academic');
 
-  const institution = (institutionsData as Institution[]).find((i) => i.code === code);
+  const institution = institutions.find((i) => i.code === code);
+
+  const ucarMedian = useMemo(() => {
+    const scores: Record<string, number> = {};
+    const keys = ['successRate', 'dropoutRate', 'curriculumCoverage', 'workloadCompliance', 'documentControlCompliance', 'auditNCRClosureRate', 'energyPerStudent', 'renewableEnergyRate', 'recyclingRate', 'genderDiversityIndex'] as const;
+    keys.forEach(k => {
+      const values = institutions.map(i => i.kpiSnapshot[k]);
+      scores[k] = Number((values.reduce((a, b) => a + b, 0) / values.length).toFixed(1));
+    });
+    return scores;
+  }, []);
+
+  const ucarBest = useMemo(() => {
+    const scores: Record<string, number> = {};
+    const maxKeys = ['successRate', 'curriculumCoverage', 'workloadCompliance', 'documentControlCompliance', 'auditNCRClosureRate', 'renewableEnergyRate', 'recyclingRate', 'genderDiversityIndex'] as const;
+    maxKeys.forEach(k => {
+      scores[k] = Math.max(...institutions.map(i => i.kpiSnapshot[k]));
+    });
+    // Lower is better
+    scores['dropoutRate'] = Math.min(...institutions.map(i => i.kpiSnapshot.dropoutRate));
+    scores['energyPerStudent'] = Math.min(...institutions.map(i => i.kpiSnapshot.energyPerStudent));
+    scores['studentFacultyRatio'] = Math.min(...institutions.map(i => i.kpiSnapshot.studentFacultyRatio));
+    return scores;
+  }, []);
 
   if (!institution) {
-    return <div className="text-sm text-slate-700">Etablissement non trouve</div>;
+    return <div className="text-sm text-slate-700">Établissement non trouvé</div>;
   }
+
+  const institutionAlerts = allAlerts.filter(a => a.institutionCode === code && a.status !== 'resolved');
 
   return (
     <div className="space-y-6">
@@ -63,12 +85,13 @@ export function InstitutionDetail() {
         <span>UCAR</span>
         <span>/</span>
         <Link to="/institutions" className="hover:text-blue-800 transition-colors duration-150">
-          Etablissements
+          Établissements
         </Link>
         <span>/</span>
         <span className="text-slate-900 font-medium">{institution.code}</span>
       </div>
 
+      {/* Header Card with UCAR Score + Rank */}
       <div className="bg-white p-6 rounded-md border border-slate-200">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           <div className="flex items-start gap-5">
@@ -89,19 +112,31 @@ export function InstitutionDetail() {
                   <MapPin size={14} /> {institution.city}
                 </span>
                 <span className="flex items-center gap-2">
-                  <Users size={14} /> {institution.students.toLocaleString()} etudiants
+                  <Users size={14} /> {institution.students.toLocaleString()} étudiants
                 </span>
-                <span>Reseau tunisien</span>
               </div>
             </div>
           </div>
 
-          <div className="flex flex-col gap-4 min-w-60">
-            <div className="bg-slate-50 p-3 rounded border border-slate-200 grid grid-cols-4 gap-2">
-              <HealthDot label="Acad." status={institution.health.academic} />
-              <HealthDot label="Fin." status={institution.health.financial} />
-              <HealthDot label="RH" status={institution.health.hr} />
-              <HealthDot label="Rech." status={institution.health.research} />
+          <div className="flex flex-col gap-4 min-w-72">
+            {/* UCAR Score + Rank + Delta */}
+            <div className="bg-slate-50 p-4 rounded border border-slate-200 flex items-center gap-6">
+              <div className="text-center">
+                <p className="text-3xl font-bold text-slate-900 font-tabular">{institution.ucarScore}</p>
+                <p className="text-xs text-slate-500 mt-1">Score UCAR</p>
+              </div>
+              <div className="h-12 w-px bg-slate-200" />
+              <div className="text-center">
+                <p className="text-2xl font-bold text-slate-900 font-tabular">#{institution.rank}</p>
+                <p className="text-xs text-slate-500 mt-1">Rang / 35</p>
+              </div>
+              <div className="h-12 w-px bg-slate-200" />
+              <div className="text-center">
+                <p className={cn('text-xl font-bold font-tabular', institution.scoreDelta >= 0 ? 'text-green-700' : 'text-red-700')}>
+                  {institution.scoreDelta >= 0 ? '+' : ''}{institution.scoreDelta}
+                </p>
+                <p className="text-xs text-slate-500 mt-1">Δ période</p>
+              </div>
             </div>
             <Link
               to="/institutions"
@@ -113,6 +148,56 @@ export function InstitutionDetail() {
         </div>
       </div>
 
+      {/* Domain Radar Chart */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="lg:col-span-5 bg-white p-5 rounded-md border border-slate-200">
+          <h3 className="text-base font-semibold text-slate-900 mb-4">Profil radar — domaines KPI</h3>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <RadarChart data={[
+                { domain: 'Académique', value: institution.domainScores.academic, median: 75 },
+                { domain: 'Durabilité', value: institution.domainScores.sustainability, median: 66 },
+                { domain: 'Gouvernance', value: institution.domainScores.governance, median: 76 },
+                { domain: 'RH', value: institution.domainScores.hr, median: 73 },
+              ]}>
+                <PolarGrid stroke="#e2e8f0" />
+                <PolarAngleAxis dataKey="domain" tick={{ fontSize: 11, fill: '#475569' }} />
+                <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                <Radar name="Institution" dataKey="value" stroke="#2563eb" fill="#2563eb" fillOpacity={0.2} strokeWidth={2} />
+                <Radar name="Médiane UCAR" dataKey="median" stroke="#94a3b8" fill="transparent" strokeWidth={1} strokeDasharray="5 5" />
+                <Tooltip contentStyle={{ borderRadius: '6px', border: '1px solid #e2e8f0', boxShadow: 'none', fontSize: '12px' }} />
+              </RadarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="lg:col-span-7 bg-white p-5 rounded-md border border-slate-200">
+          <h3 className="text-base font-semibold text-slate-900 mb-4">Alertes institution</h3>
+          {institutionAlerts.length === 0 ? (
+            <div className="text-center py-10">
+              <TrendingUp size={32} className="mx-auto text-green-600 mb-2" />
+              <p className="text-sm text-slate-600">Aucune alerte active pour cet établissement.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {institutionAlerts.map(alert => (
+                <div key={alert.id} className={cn(
+                  'p-3 rounded-md border flex items-start gap-3',
+                  alert.severity === 'critical' ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'
+                )}>
+                  <AlertCircle size={16} className={alert.severity === 'critical' ? 'text-red-600 mt-0.5' : 'text-amber-600 mt-0.5'} />
+                  <div>
+                    <p className="text-sm font-medium text-slate-900">{alert.title}</p>
+                    <p className="text-xs text-slate-600 mt-1">{alert.description}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Tabs */}
       <div className="flex flex-wrap items-center gap-2 bg-white p-2 rounded-md border border-slate-200">
         {tabs.map((tab) => (
           <button
@@ -129,311 +214,323 @@ export function InstitutionDetail() {
         ))}
       </div>
 
-      {activeTab === 'academic' && <AcademicTab institution={institution} />}
-      {activeTab === 'financial' && <FinancialTab institution={institution} />}
-      {activeTab === 'hr' && <HRTab institution={institution} />}
-      {activeTab === 'research' && <ResearchTab institution={institution} />}
-      {activeTab === 'infra' && <InfraTab institution={institution} />}
+      {activeTab === 'academic' && <AcademicTab institution={institution} ucarMedian={ucarMedian} ucarBest={ucarBest} />}
+      {activeTab === 'sustainability' && <SustainabilityTab institution={institution} ucarMedian={ucarMedian} ucarBest={ucarBest} />}
+      {activeTab === 'governance' && <GovernanceTab institution={institution} ucarMedian={ucarMedian} ucarBest={ucarBest} />}
+      {activeTab === 'hr' && <HRTab institution={institution} ucarMedian={ucarMedian} ucarBest={ucarBest} />}
+      {activeTab === 'accreditation' && <AccreditationTab institution={institution} />}
     </div>
   );
 }
 
-function HealthDot({ label, status }: { label: string; status: HealthStatus }) {
-  const colors = {
-    good: 'bg-green-600',
-    warning: 'bg-amber-500',
-    critical: 'bg-red-600',
-  };
+function KPIStatus({ value, thresholds }: { value: number; thresholds: { green: number; amber: number }; }) {
+  const status = value >= thresholds.green ? 'good' : value >= thresholds.amber ? 'warning' : 'critical';
+  const colors = { good: 'bg-green-600', warning: 'bg-amber-500', critical: 'bg-red-600' };
+  return <div className={cn('w-2.5 h-2.5 rounded-full inline-block', colors[status])} />;
+}
 
+function ComparisonRow({ label, kpiId, value, median, best, unit = '%', lowerBetter = false }: {
+  label: string; kpiId: string; value: number; median: number; best: number; unit?: string; lowerBetter?: boolean;
+}) {
+  const isGood = lowerBetter ? value <= median : value >= median;
   return (
-    <div className="flex flex-col items-center gap-1.5">
-      <div className={cn('w-2.5 h-2.5 rounded-full', colors[status])} />
-      <span className="text-[10px] font-medium text-slate-500">{label}</span>
+    <tr className="hover:bg-slate-50">
+      <td className="px-4 py-2.5 text-sm text-slate-700">{label} <span className="text-xs text-slate-400">({kpiId})</span></td>
+      <td className={cn('px-4 py-2.5 text-sm text-right font-tabular font-medium', isGood ? 'text-green-700' : 'text-red-700')}>{value}{unit}</td>
+      <td className="px-4 py-2.5 text-sm text-right font-tabular text-slate-600">{median}{unit}</td>
+      <td className="px-4 py-2.5 text-sm text-right font-tabular text-slate-500">{best}{unit}</td>
+    </tr>
+  );
+}
+
+function ComparisonTable({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="bg-white rounded-md border border-slate-200 overflow-hidden">
+      <div className="px-4 py-3 border-b border-slate-200">
+        <h4 className="text-sm font-semibold text-slate-900">Comparaison réseau</h4>
+      </div>
+      <table className="w-full text-left">
+        <thead className="bg-slate-50 border-b border-slate-200">
+          <tr>
+            <th className="px-4 py-2 text-xs font-semibold text-slate-700">KPI</th>
+            <th className="px-4 py-2 text-xs font-semibold text-slate-700 text-right">Institution</th>
+            <th className="px-4 py-2 text-xs font-semibold text-slate-700 text-right">Médiane</th>
+            <th className="px-4 py-2 text-xs font-semibold text-slate-700 text-right">Meilleur</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-200">
+          {children}
+        </tbody>
+      </table>
     </div>
   );
 }
 
-function AcademicTab({ institution }: { institution: Institution }) {
-  const data = [
-    { name: 'S1 22', rate: 71 },
-    { name: 'S2 22', rate: 74 },
-    { name: 'S1 23', rate: 72 },
-    { name: 'S2 23', rate: 76 },
-    { name: 'S1 24', rate: 75 },
-    { name: 'S2 24', rate: institution.kpi_snapshot?.taux_reussite ?? 0 },
-  ];
+interface TabProps {
+  institution: DashboardInstitution;
+  ucarMedian: Record<string, number>;
+  ucarBest: Record<string, number>;
+}
 
-  const programData = [
-    { name: 'Info.', success: 82, failures: 12 },
-    { name: 'Telecom', success: 75, failures: 18 },
-    { name: 'Bio.', success: 68, failures: 24 },
-    { name: 'Indus.', success: 71, failures: 21 },
-  ];
+function AcademicTab({ institution, ucarMedian, ucarBest }: TabProps) {
+  const series = institutionKpiSeries[institution.code];
+  const trendData = series ? series.periods.map((p, i) => ({
+    name: p,
+    successRate: series.successRate[i],
+    curriculumCoverage: series.curriculumCoverage[i],
+  })) : [];
 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPICard label="Taux de reussite" value={institution.kpi_snapshot?.taux_reussite ?? 0} suffix="%" icon={TrendingUp} trend={{ value: 2.1, unit: '%' }} />
-        <KPICard label="Taux d'abandon" value={institution.kpi_snapshot?.taux_abandon ?? 0} suffix="%" icon={Users} trend={{ value: -0.4, unit: '%', isPositiveGood: false }} />
-        <KPICard label="Redoublement" value={institution.kpi_snapshot?.taux_redoublement ?? 0} suffix="%" icon={FileText} trend={{ value: 0, unit: '%' }} />
-        <KPICard label="Mention TB" value={18.7} suffix="%" icon={Trophy} trend={{ value: 1.2, unit: '%' }} />
+        <KPICard label="Ratio étudiants/enseignants" value={institution.kpiSnapshot.studentFacultyRatio} icon={Users} badge="ACA-01" />
+        <KPICard label="Taux de réussite" value={institution.kpiSnapshot.successRate} suffix="%" icon={TrendingUp} badge="ACA-02" trend={{ value: 1.2, unit: '%' }} />
+        <KPICard label="Taux d'abandon" value={institution.kpiSnapshot.dropoutRate} suffix="%" icon={TrendingDown} badge="ACA-03" trend={{ value: -0.2, unit: '%', isPositiveGood: false }} />
+        <KPICard label="Couverture programme" value={institution.kpiSnapshot.curriculumCoverage} suffix="%" icon={GraduationCap} badge="ACA-05" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white p-5 rounded-md border border-slate-200">
-          <h3 className="text-base font-semibold text-slate-900 mb-4">Evolution de la reussite</h3>
+          <h3 className="text-base font-semibold text-slate-900 mb-4">Évolution — réussite et couverture</h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data}>
+              <AreaChart data={trendData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#475569' }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#475569' }} unit="%" />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#475569' }} unit="%" domain={[60, 100]} />
                 <Tooltip contentStyle={{ borderRadius: '6px', border: '1px solid #cbd5e1', boxShadow: 'none' }} />
-                <Area type="monotone" dataKey="rate" stroke="#1d4ed8" strokeWidth={2} fill="#bfdbfe" fillOpacity={0.4} />
+                <Area type="monotone" dataKey="successRate" stroke="#1d4ed8" strokeWidth={2} fill="#bfdbfe" fillOpacity={0.4} name="Réussite (ACA-02)" />
+                <Area type="monotone" dataKey="curriculumCoverage" stroke="#0f766e" strokeWidth={2} fill="#99f6e4" fillOpacity={0.2} name="Couverture (ACA-05)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
 
+        <ComparisonTable>
+          <ComparisonRow label="Ratio étudiants/ens." kpiId="ACA-01" value={institution.kpiSnapshot.studentFacultyRatio} median={ucarMedian['studentFacultyRatio'] ?? 28} best={ucarBest['studentFacultyRatio'] ?? 20.9} unit="" lowerBetter />
+          <ComparisonRow label="Taux de réussite" kpiId="ACA-02" value={institution.kpiSnapshot.successRate} median={ucarMedian['successRate']} best={ucarBest['successRate']} />
+          <ComparisonRow label="Taux d'abandon" kpiId="ACA-03" value={institution.kpiSnapshot.dropoutRate} median={ucarMedian['dropoutRate']} best={ucarBest['dropoutRate']} lowerBetter />
+          <ComparisonRow label="Couverture programme" kpiId="ACA-05" value={institution.kpiSnapshot.curriculumCoverage} median={ucarMedian['curriculumCoverage']} best={ucarBest['curriculumCoverage']} />
+        </ComparisonTable>
+      </div>
+    </div>
+  );
+}
+
+function SustainabilityTab({ institution, ucarMedian, ucarBest }: TabProps) {
+  const esgData = [
+    { name: 'Énergie / étudiant', value: institution.kpiSnapshot.energyPerStudent, max: 3000, unit: 'kWh' },
+    { name: 'Renouvelable', value: institution.kpiSnapshot.renewableEnergyRate, max: 100, unit: '%' },
+    { name: 'Recyclage', value: institution.kpiSnapshot.recyclingRate, max: 100, unit: '%' },
+    { name: 'Diversité genre', value: Math.round(institution.kpiSnapshot.genderDiversityIndex * 100), max: 100, unit: '%' },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <KPICard label="Énergie / étudiant" value={institution.kpiSnapshot.energyPerStudent} suffix=" kWh" icon={Leaf} badge="ESG-01" />
+        <KPICard label="Énergie renouvelable" value={institution.kpiSnapshot.renewableEnergyRate} suffix="%" icon={Leaf} badge="ESG-03" />
+        <KPICard label="Taux de recyclage" value={institution.kpiSnapshot.recyclingRate} suffix="%" icon={Leaf} badge="ESG-04" />
+        <KPICard label="Index diversité genre" value={institution.kpiSnapshot.genderDiversityIndex} icon={Users} badge="ESG-07" />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white p-5 rounded-md border border-slate-200">
-          <h3 className="text-base font-semibold text-slate-900 mb-4">Performance par filiere</h3>
+          <h3 className="text-base font-semibold text-slate-900 mb-4">Indicateurs ESG — UI GreenMetric</h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={programData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#475569' }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#475569' }} unit="%" />
+              <BarChart data={esgData} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
+                <XAxis type="number" hide />
+                <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#475569' }} width={120} />
                 <Tooltip contentStyle={{ borderRadius: '6px', border: '1px solid #cbd5e1', boxShadow: 'none' }} />
-                <Bar dataKey="success" name="Reussite" fill="#1d4ed8" radius={[2, 2, 0, 0]} barSize={20} />
-                <Bar dataKey="failures" name="Echec" fill="#dc2626" radius={[2, 2, 0, 0]} barSize={20} />
+                <Bar dataKey="value" name="Valeur" fill="#0f766e" radius={[0, 4, 4, 0]} barSize={16} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
+
+        <ComparisonTable>
+          <ComparisonRow label="Énergie / étudiant" kpiId="ESG-01" value={institution.kpiSnapshot.energyPerStudent} median={ucarMedian['energyPerStudent'] ?? 1806} best={ucarBest['energyPerStudent'] ?? 1350} unit=" kWh" lowerBetter />
+          <ComparisonRow label="Énergie renouvelable" kpiId="ESG-03" value={institution.kpiSnapshot.renewableEnergyRate} median={ucarMedian['renewableEnergyRate']} best={ucarBest['renewableEnergyRate']} />
+          <ComparisonRow label="Recyclage" kpiId="ESG-04" value={institution.kpiSnapshot.recyclingRate} median={ucarMedian['recyclingRate']} best={ucarBest['recyclingRate']} />
+          <ComparisonRow label="Diversité genre" kpiId="ESG-07" value={institution.kpiSnapshot.genderDiversityIndex} median={ucarMedian['genderDiversityIndex']} best={ucarBest['genderDiversityIndex']} unit="" />
+        </ComparisonTable>
       </div>
     </div>
   );
 }
 
-function FinancialTab({ institution }: { institution: Institution }) {
-  const budgetData = [
-    { name: 'Chap. 1', alloue: 1800, engage: 1400, paye: 1200 },
-    { name: 'Chap. 2', alloue: 600, engage: 400, paye: 350 },
-    { name: 'Chap. 3', alloue: 300, engage: 280, paye: 210 },
-    { name: 'Chap. 4', alloue: 150, engage: 120, paye: 100 },
-  ];
+function GovernanceTab({ institution, ucarMedian, ucarBest }: TabProps) {
+  const series = institutionKpiSeries[institution.code];
+  const trendData = series ? series.periods.map((p, i) => ({
+    name: p,
+    compliance: series.documentControlCompliance[i],
+  })) : [];
 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPICard label="Budget alloue" value="2 850" suffix="k TND" icon={Wallet} />
-        <KPICard label="Taux d'execution" value={institution.kpi_snapshot?.budget_execution ?? 0} suffix="%" icon={TrendingUp} />
-        <KPICard label="Masse salariale" value={institution.kpi_snapshot?.masse_salariale_pct ?? 0} suffix="%" icon={Users} />
-        <KPICard label="Projection fin d'annee" value={91} suffix="%" icon={TrendingUp} />
+        <KPICard label="Conformité documentaire" value={institution.kpiSnapshot.documentControlCompliance} suffix="%" icon={ShieldCheck} badge="GOV-01" trend={{ value: 1.3, unit: '%' }} />
+        <KPICard label="Clôture NCR audit" value={institution.kpiSnapshot.auditNCRClosureRate} suffix="%" icon={ShieldCheck} badge="GOV-02" />
+        <KPICard label="Score domaine" value={institution.domainScores.governance} suffix="/100" icon={ShieldCheck} />
+        <KPICard label="Alertes gouvernance" value={allAlerts.filter(a => a.institutionCode === institution.code && a.domain === 'Gouvernance' && a.status !== 'resolved').length} icon={AlertCircle} />
       </div>
 
-      <div className="bg-white p-6 rounded-md border border-slate-200">
-        <h3 className="text-base font-semibold text-slate-900 mb-6">Structure de l'execution budgetaire</h3>
-
-        <BudgetProgress paye={institution.kpi_snapshot?.budget_execution ?? 0} engage={15} mandate={10} />
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
-          <div className="space-y-4">
-            <h4 className="text-sm font-medium text-slate-700">Detail par chapitre</h4>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={budgetData} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
-                  <XAxis type="number" hide />
-                  <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#475569' }} />
-                  <Tooltip contentStyle={{ borderRadius: '6px', border: '1px solid #cbd5e1', boxShadow: 'none' }} />
-                  <Bar dataKey="alloue" name="Alloue" fill="#cbd5e1" radius={[0, 2, 2, 0]} barSize={16} />
-                  <Bar dataKey="paye" name="Paye" fill="#1d4ed8" radius={[0, 2, 2, 0]} barSize={16} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          <div className="bg-slate-50 p-5 rounded-md border border-slate-200 h-fit">
-            <h4 className="text-sm font-semibold text-slate-900 mb-3">Observation analytique</h4>
-            <p className="text-sm text-slate-700 leading-relaxed">
-              L'execution budgetaire est en phase avec les objectifs du trimestre, a l'exception du Chapitre 2 (Investissement)
-              qui accuse un retard de facturation sur les equipements de laboratoire. Une regularisation est attendue en S2.
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function BudgetProgress({ paye, engage, mandate }: { paye: number; engage: number; mandate: number }) {
-  const payeWidth = Math.max(0, Math.min(paye, 100));
-  const mandateWidth = Math.max(0, Math.min(mandate, 100 - payeWidth));
-  const engageWidth = Math.max(0, Math.min(engage, 100 - payeWidth - mandateWidth));
-
-  return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-end">
-        <div className="space-y-1">
-          <span className="text-3xl font-semibold text-slate-900">{paye}%</span>
-          <p className="text-xs text-slate-600">Paye a ce jour</p>
-        </div>
-        <div className="text-right">
-          <span className="text-lg font-semibold text-slate-800">{100 - paye}%</span>
-          <p className="text-xs text-slate-600">Solde restant</p>
-        </div>
-      </div>
-      <div className="h-4 w-full bg-slate-100 rounded-full overflow-hidden flex">
-        <div className="h-full bg-blue-700" style={{ width: `${payeWidth}%` }} />
-        <div className="h-full bg-blue-400" style={{ width: `${mandateWidth}%` }} />
-        <div className="h-full bg-blue-200" style={{ width: `${engageWidth}%` }} />
-      </div>
-      <div className="flex flex-wrap gap-4 pt-1">
-        <LegendItem2 color="bg-blue-700" label="Paye" value={`${paye}%`} />
-        <LegendItem2 color="bg-blue-400" label="Mandate" value={`${mandate}%`} />
-        <LegendItem2 color="bg-blue-200" label="Engage" value={`${engage}%`} />
-        <LegendItem2 color="bg-slate-100" label="Solde" value={`${Math.max(0, 100 - (paye + mandate + engage))}%`} />
-      </div>
-    </div>
-  );
-}
-
-function LegendItem2({ color, label, value }: { color: string; label: string; value: string }) {
-  return (
-    <div className="flex items-center gap-2">
-      <div className={cn('w-3 h-3 rounded-[3px] border border-slate-300', color)} />
-      <span className="text-xs text-slate-700">{label}:</span>
-      <span className="text-xs font-semibold text-slate-900">{value}</span>
-    </div>
-  );
-}
-
-function HRTab({ institution }: { institution: Institution }) {
-  const staffData = [
-    { name: 'Corps A', value: 48 },
-    { name: 'Corps B', value: 124 },
-    { name: 'Admin', value: 85 },
-    { name: 'Vacataires', value: 55 },
-  ];
-
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPICard label="Effectif total" value={312} icon={Users} />
-        <KPICard label="Taux d'encadrement" value={`1 / ${institution.kpi_snapshot?.taux_encadrement ?? 0}`} icon={UserRoundCheck} />
-        <KPICard label="Absenteisme" value={institution.kpi_snapshot?.taux_absenteisme ?? 0} suffix="%" icon={TrendingDown} trend={{ value: 0.5, unit: '%', isPositiveGood: false }} />
-        <KPICard label="Taux vacataires" value={institution.kpi_snapshot?.taux_vacataires ?? 0} suffix="%" icon={Users} />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-4 bg-white p-5 rounded-md border border-slate-200">
-          <h3 className="text-base font-semibold text-slate-900 mb-5">Repartition du personnel</h3>
-          <div className="h-64 relative">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white p-5 rounded-md border border-slate-200">
+          <h3 className="text-base font-semibold text-slate-900 mb-4">Évolution — conformité documentaire (GOV-01)</h3>
+          <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={staffData} cx="50%" cy="50%" innerRadius={55} outerRadius={75} paddingAngle={2} dataKey="value">
-                  {staffData.map((_, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
+              <AreaChart data={trendData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#475569' }} dy={10} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#475569' }} unit="%" domain={[60, 100]} />
                 <Tooltip contentStyle={{ borderRadius: '6px', border: '1px solid #cbd5e1', boxShadow: 'none' }} />
-              </PieChart>
+                <Area type="monotone" dataKey="compliance" stroke="#1d4ed8" strokeWidth={2} fill="#bfdbfe" fillOpacity={0.4} name="GOV-01" />
+              </AreaChart>
             </ResponsiveContainer>
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <span className="text-2xl font-semibold text-slate-900">312</span>
-              <span className="text-xs text-slate-600">Total</span>
-            </div>
-          </div>
-          <div className="space-y-2 mt-4">
-            {staffData.map((item, idx) => (
-              <div key={item.name} className="flex justify-between items-center text-xs">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[idx] }} />
-                  <span className="text-slate-700">{item.name}</span>
-                </div>
-                <span className="text-slate-900 font-medium">{item.value}</span>
-              </div>
-            ))}
           </div>
         </div>
 
-        <div className="lg:col-span-8 bg-white p-5 rounded-md border border-slate-200">
-          <h3 className="text-base font-semibold text-slate-900 mb-6">Charge d'enseignement (ETD)</h3>
-          <div className="space-y-5">
-            <LoadBar label="Corps A" value={210} max={250} />
-            <LoadBar label="Corps B" value={285} max={250} />
-            <LoadBar label="Vacataires" value={140} max={250} />
+        <ComparisonTable>
+          <ComparisonRow label="Conformité doc." kpiId="GOV-01" value={institution.kpiSnapshot.documentControlCompliance} median={ucarMedian['documentControlCompliance']} best={ucarBest['documentControlCompliance']} />
+          <ComparisonRow label="Clôture NCR" kpiId="GOV-02" value={institution.kpiSnapshot.auditNCRClosureRate} median={ucarMedian['auditNCRClosureRate']} best={ucarBest['auditNCRClosureRate']} />
+        </ComparisonTable>
+      </div>
+    </div>
+  );
+}
+
+function HRTab({ institution, ucarMedian, ucarBest }: TabProps) {
+  const series = institutionKpiSeries[institution.code];
+  const trendData = series ? series.periods.map((p, i) => ({
+    name: p,
+    workload: series.workloadCompliance[i],
+  })) : [];
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <KPICard label="Conformité charge" value={institution.kpiSnapshot.workloadCompliance} suffix="%" icon={UserRoundCheck} badge="HR-01" trend={{ value: 1.0, unit: '%' }} />
+        <KPICard label="Formation accomplie" value={institution.kpiSnapshot.trainingFulfillment} suffix="%" icon={GraduationCap} badge="HR-05" />
+        <KPICard label="Score domaine RH" value={institution.domainScores.hr} suffix="/100" icon={Users} />
+        <KPICard label="Alertes RH" value={allAlerts.filter(a => a.institutionCode === institution.code && a.domain === 'RH' && a.status !== 'resolved').length} icon={AlertCircle} />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white p-5 rounded-md border border-slate-200">
+          <h3 className="text-base font-semibold text-slate-900 mb-4">Évolution — conformité charge (HR-01)</h3>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={trendData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#475569' }} dy={10} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#475569' }} unit="%" domain={[60, 100]} />
+                <Tooltip contentStyle={{ borderRadius: '6px', border: '1px solid #cbd5e1', boxShadow: 'none' }} />
+                <Area type="monotone" dataKey="workload" stroke="#b45309" strokeWidth={2} fill="#fde68a" fillOpacity={0.3} name="HR-01" />
+              </AreaChart>
+            </ResponsiveContainer>
           </div>
-          <div className="mt-8 bg-red-50 p-4 rounded-md border border-red-200 flex items-start gap-3">
-            <div className="p-2 bg-red-600 rounded text-white">
-              <AlertCircle size={16} />
+
+          {institution.kpiSnapshot.workloadCompliance < 80 && (
+            <div className="mt-4 bg-red-50 p-4 rounded-md border border-red-200 flex items-start gap-3">
+              <div className="p-2 bg-red-600 rounded text-white">
+                <AlertCircle size={16} />
+              </div>
+              <div>
+                <h4 className="text-sm font-semibold text-red-800">Alerte surcharge</h4>
+                <p className="text-sm text-red-700 mt-1">
+                  La conformité de charge est en dessous du seuil de 80%. Un plan de correction est requis.
+                </p>
+              </div>
             </div>
-            <div>
-              <h4 className="text-sm font-semibold text-red-800">Alerte surcharge</h4>
-              <p className="text-sm text-red-700 mt-1">
-                Le Corps B presente une surcharge moyenne de 14% par rapport au referentiel ETD normal.
-                Un appel a vacataires supplementaire est en cours d'approbation.
+          )}
+        </div>
+
+        <ComparisonTable>
+          <ComparisonRow label="Conformité charge" kpiId="HR-01" value={institution.kpiSnapshot.workloadCompliance} median={ucarMedian['workloadCompliance']} best={ucarBest['workloadCompliance']} />
+          <ComparisonRow label="Formation" kpiId="HR-05" value={institution.kpiSnapshot.trainingFulfillment} median={72} best={88.4} />
+        </ComparisonTable>
+      </div>
+    </div>
+  );
+}
+
+function AccreditationTab({ institution }: { institution: DashboardInstitution }) {
+  const frameworks = [
+    { key: 'iso9001' as const, name: 'ISO 9001', description: 'Management de la qualité' },
+    { key: 'iso21001' as const, name: 'ISO 21001', description: 'Organisations éducatives' },
+    { key: 'uiGreenMetric' as const, name: 'UI GreenMetric', description: 'Durabilité universitaire' },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {frameworks.map(fw => {
+          const data = institution.accreditation[fw.key];
+          const pct = Math.round((data.passingControls / data.totalControls) * 100);
+          return (
+            <div key={fw.key} className="bg-white p-5 rounded-md border border-slate-200">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900">{fw.name}</h3>
+                  <p className="text-xs text-slate-500">{fw.description}</p>
+                </div>
+                <span className={cn(
+                  'text-2xl font-bold font-tabular',
+                  pct >= 70 ? 'text-green-700' : pct >= 50 ? 'text-amber-600' : 'text-red-700'
+                )}>{pct}%</span>
+              </div>
+              <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
+                <div className={cn(
+                  'h-full rounded-full transition-all duration-300',
+                  pct >= 70 ? 'bg-green-600' : pct >= 50 ? 'bg-amber-500' : 'bg-red-600'
+                )} style={{ width: `${pct}%` }} />
+              </div>
+              <p className="text-xs text-slate-500 mt-2 font-tabular">
+                {data.passingControls} / {data.totalControls} contrôles conformes
               </p>
             </div>
-          </div>
-        </div>
+          );
+        })}
       </div>
-    </div>
-  );
-}
 
-function LoadBar({ label, value, max }: { label: string; value: number; max: number }) {
-  const percentage = Math.min((value / max) * 100, 100);
-  const isOverloaded = value > max;
-
-  return (
-    <div className="space-y-2">
-      <div className="flex justify-between text-sm">
-        <span className="text-slate-700">{label}</span>
-        <span className={cn(isOverloaded ? 'text-red-700 font-medium' : 'text-slate-900 font-medium')}>
-          {value} ETD {isOverloaded && '(Surcharge)'}
-        </span>
-      </div>
-      <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden">
-        <div className={cn('h-full rounded-full', isOverloaded ? 'bg-red-600' : 'bg-green-700')} style={{ width: `${percentage}%` }} />
-      </div>
-    </div>
-  );
-}
-
-function ResearchTab({ institution }: { institution: Institution }) {
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPICard label="Publications indexees" value={institution.kpi_snapshot?.publications_indexees ?? 0} suffix=" / an" icon={FileText} />
-        <KPICard label="Theses actives" value={institution.kpi_snapshot?.theses_actives ?? 0} icon={GraduationCap} />
-        <KPICard label="Financements (TND)" value="320k" icon={Wallet} />
-        <KPICard label="Laboratoires" value={8} icon={FlaskConical} />
-      </div>
-      <div className="bg-white p-10 rounded-md border border-slate-200 text-center">
-        <FlaskConical size={40} className="mx-auto text-slate-400 mb-4" />
-        <p className="text-sm text-slate-600">Visualisation des reseaux de recherche en cours de deploiement.</p>
-      </div>
-    </div>
-  );
-}
-
-function InfraTab({ institution }: { institution: Institution }) {
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <div className="bg-white p-6 rounded-md border border-slate-200 text-center">
-        <KPICard label="Taux d'occupation" value={institution.kpi_snapshot?.room_occupancy ?? 0} suffix="%" icon={Building2} />
-        <div className="mt-6 text-sm text-slate-700 leading-relaxed">
-          Occupation optimale des salles de cours et amphitheatres. Les creneaux du soir (18h-20h)
-          sont disponibles pour la formation continue.
-        </div>
-      </div>
-      <div className="bg-white p-6 rounded-md border border-slate-200 flex flex-col justify-center items-center gap-6">
-        <div className="w-40 h-40 rounded-full border-8 border-green-700 flex flex-col items-center justify-center p-2">
-          <span className="text-3xl font-semibold text-slate-900">94%</span>
-          <span className="text-xs text-slate-600 text-center">Equipements operationnels</span>
-        </div>
+      <div className="bg-white p-5 rounded-md border border-slate-200">
+        <h3 className="text-base font-semibold text-slate-900 mb-4">Détail par framework</h3>
+        <table className="w-full text-left">
+          <thead className="bg-slate-50 border-b border-slate-200">
+            <tr>
+              <th className="px-4 py-2.5 text-xs font-semibold text-slate-700">Framework</th>
+              <th className="px-4 py-2.5 text-xs font-semibold text-slate-700 text-right">Conformes</th>
+              <th className="px-4 py-2.5 text-xs font-semibold text-slate-700 text-right">Total</th>
+              <th className="px-4 py-2.5 text-xs font-semibold text-slate-700 text-right">Taux</th>
+              <th className="px-4 py-2.5 text-xs font-semibold text-slate-700 text-right">Statut</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-200">
+            {frameworks.map(fw => {
+              const data = institution.accreditation[fw.key];
+              const pct = Math.round((data.passingControls / data.totalControls) * 100);
+              return (
+                <tr key={fw.key} className="hover:bg-slate-50">
+                  <td className="px-4 py-3 text-sm font-medium text-slate-900">{fw.name}</td>
+                  <td className="px-4 py-3 text-sm text-right font-tabular text-slate-700">{data.passingControls}</td>
+                  <td className="px-4 py-3 text-sm text-right font-tabular text-slate-700">{data.totalControls}</td>
+                  <td className="px-4 py-3 text-sm text-right font-tabular font-semibold text-slate-900">{pct}%</td>
+                  <td className="px-4 py-3 text-right">
+                    <span className={cn(
+                      'px-2 py-0.5 rounded text-xs font-medium',
+                      pct >= 70 ? 'bg-green-50 text-green-700' : pct >= 50 ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'
+                    )}>
+                      {pct >= 70 ? 'En bonne voie' : pct >= 50 ? 'À améliorer' : 'Critique'}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     </div>
   );

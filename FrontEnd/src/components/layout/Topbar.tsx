@@ -4,7 +4,7 @@ import { useLocation } from 'react-router-dom';
 const pageTitles: Record<string, string> = {
   '/': 'Tableau KPI UCAR',
   '/institutions': 'Établissements',
-  '/conventions': 'Gestion des conventions',
+  '/rankings': 'Classement UCAR',
   '/finance': 'Suivi financier',
   '/alertes': 'Alertes et conformité',
   '/reports': 'Rapports et analyses'
@@ -25,7 +25,7 @@ export function Topbar() {
       <div className="flex items-center gap-6">
         <div className="hidden md:flex items-center gap-4">
           <div className="flex flex-col items-end">
-            <span className="text-xs font-medium text-slate-500">Stabilite reseau</span>
+            <span className="text-xs font-medium text-slate-500">Stabilité réseau</span>
             <span className="text-sm font-semibold text-green-700 font-tabular">99.98% stable</span>
           </div>
           <div className="h-8 w-px bg-slate-200" />
@@ -43,7 +43,7 @@ export function Topbar() {
 
           <button className="relative p-2 text-slate-600 hover:bg-slate-100 rounded-md transition-colors duration-150 border border-slate-200">
             <Bell size={18} />
-            <span className="absolute top-2 right-2 w-2 h-2 bg-status-critical rounded-full border-2 border-surface" />
+            <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
           </button>
 
           <button className="p-2 text-slate-600 hover:bg-slate-100 rounded-md transition-colors duration-150 border border-slate-200">

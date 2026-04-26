@@ -31,11 +31,19 @@
 
 @layer base {
   body {
-    background-color: var(--color-off-white);
+    background:
+      radial-gradient(1200px 480px at 10% -10%, #dbeafe 0%, transparent 55%),
+      radial-gradient(900px 420px at 95% 0%, #e2e8f0 0%, transparent 60%),
+      var(--color-off-white);
     color: var(--color-blue-900);
     font-family: var(--font-sans);
     @apply antialiased;
   }
+}
+
+.app-atmosphere {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.92) 0%, rgba(248, 250, 252, 0.96) 100%);
 }
 
 /* Disable all non-essential animations sitewide for accessibility */

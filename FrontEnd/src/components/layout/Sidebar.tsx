@@ -1,7 +1,7 @@
 import {
   LayoutDashboard,
   School,
-  FileCheck,
+  Trophy,
   Bell,
   FileText,
   Wallet,
@@ -16,10 +16,10 @@ import { cn } from '@/src/lib/utils';
 
 const navItems = [
   { icon: LayoutDashboard, label: 'Tableau KPI', path: '/' },
-  { icon: School, label: 'Etablissements', path: '/institutions' },
-  { icon: FileCheck, label: 'Conventions', path: '/conventions' },
-  { icon: Wallet, label: 'Finance', path: '/finance' },
-  { icon: Bell, label: 'Alertes & conformité', path: '/alertes', badge: 8 },
+  { icon: School, label: 'Établissements', path: '/institutions' },
+  { icon: Trophy, label: 'Classement UCAR', path: '/rankings' },
+  { icon: Bell, label: 'Alertes & conformité', path: '/alertes', badge: 6 },
+  { icon: Wallet, label: 'Suivi financier', path: '/finance' },
   { icon: FileText, label: 'Rapports', path: '/reports' },
 ];
 
@@ -45,7 +45,7 @@ export function Sidebar() {
         <button 
           onClick={toggleSidebar}
           className="p-2 hover:bg-slate-800 rounded text-slate-300 transition-colors duration-150"
-          aria-label={sidebarCollapsed ? 'Developper la barre laterale' : 'Reduire la barre laterale'}
+          aria-label={sidebarCollapsed ? 'Développer la barre latérale' : 'Réduire la barre latérale'}
         >
           {sidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
         </button>
@@ -120,7 +120,7 @@ export function Sidebar() {
           {!sidebarCollapsed && (
             <div className="overflow-hidden">
               <p className="text-sm font-semibold text-white truncate">Dr. Ben Salah</p>
-              <p className="text-xs text-slate-400 truncate">Lead Architect</p>
+              <p className="text-xs text-slate-400 truncate">Président UCAR</p>
             </div>
           )}
         </div>

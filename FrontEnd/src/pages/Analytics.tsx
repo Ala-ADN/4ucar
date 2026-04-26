@@ -1,25 +1,29 @@
 import { useMemo, useState } from 'react';
-import kpiData from '@/src/data/kpis.json';
+import { institutionKpiSeries } from '@/src/data/dashboardMock';
 
 const options = [
-  { key: 'taux_reussite', label: 'Taux de reussite' },
-  { key: 'taux_abandon', label: 'Taux d abandon' },
-  { key: 'budget_execution', label: 'Budget execute' },
+  { key: 'successRate', label: 'Taux de réussite (ACA-02)' },
+  { key: 'curriculumCoverage', label: 'Couverture programme (ACA-05)' },
+  { key: 'workloadCompliance', label: 'Conformité charge (HR-01)' },
+  { key: 'documentControlCompliance', label: 'Conformité documentaire (GOV-01)' },
+  { key: 'dropoutRate', label: 'Taux d\'abandon (ACA-03)' },
 ] as const;
 
 type KpiKey = (typeof options)[number]['key'];
 
 export function Analytics() {
-  const [selected, setSelected] = useState<KpiKey>('taux_reussite');
+  const [selected, setSelected] = useState<KpiKey>('successRate');
 
   const rows = useMemo(() => {
-    const entries = Object.entries(kpiData) as Array<[string, any]>;
+    const entries = Object.entries(institutionKpiSeries);
     return entries.map(([code, value]) => {
       const series = value[selected] as number[];
       const current = series[series.length - 1] ?? 0;
       const previous = series[series.length - 2] ?? current;
       return {
         code,
+        periods: value.periods,
+        series,
         current,
         delta: Number((current - previous).toFixed(1)),
       };
@@ -31,7 +35,7 @@ export function Analytics() {
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
           <h2 className="text-xl font-semibold text-slate-900">Rapports et analyses</h2>
-          <p className="text-sm text-slate-600 mt-1">Lecture consolidee des evolutions KPI sur 6 semestres</p>
+          <p className="text-sm text-slate-600 mt-1">Lecture consolidée des évolutions KPI sur 4 semestres</p>
         </div>
         <div>
           <select
@@ -50,8 +54,8 @@ export function Analytics() {
         <table className="w-full text-left">
           <thead className="bg-slate-50 border-b border-slate-200">
             <tr>
-              <th className="px-4 py-3 text-xs font-semibold text-slate-700">Etablissement</th>
-              <th className="px-4 py-3 text-xs font-semibold text-slate-700">Semestres observes</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-700">Établissement</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-700">Semestres observés</th>
               <th className="px-4 py-3 text-xs font-semibold text-slate-700 text-right">Valeur actuelle</th>
               <th className="px-4 py-3 text-xs font-semibold text-slate-700 text-right">Variation</th>
             </tr>
@@ -60,8 +64,12 @@ export function Analytics() {
             {rows.map((row) => (
               <tr key={row.code} className="hover:bg-slate-50">
                 <td className="px-4 py-3 text-sm font-medium text-slate-900">{row.code}</td>
-                <td className="px-4 py-3 text-sm text-slate-700">6</td>
-                <td className="px-4 py-3 text-sm text-right font-tabular text-slate-900">{row.current}%</td>
+                <td className="px-4 py-3 text-sm text-slate-700">{row.periods.length}</td>
+                <td className="px-4 py-3 text-sm text-right font-tabular text-slate-900">
+                  {selected === 'dropoutRate' || selected === 'successRate' || selected === 'curriculumCoverage' || selected === 'workloadCompliance' || selected === 'documentControlCompliance' 
+                    ? `${row.current}%` 
+                    : row.current}
+                </td>
                 <td className="px-4 py-3 text-sm text-right font-tabular">
                   <span className={row.delta >= 0 ? 'text-green-700' : 'text-red-700'}>
                     {row.delta >= 0 ? '+' : ''}{row.delta}%

@@ -1,11 +1,11 @@
-import { AlertCircle, CheckCircle2, Clock, Filter, Download } from "lucide-react";
+import { CheckCircle2, Clock, Filter, Download } from "lucide-react";
 import React, { useState } from "react";
-import { Alert, HealthStatus } from "@/src/types";
-import alertsData from "@/src/data/alerts.json";
+import { AlertRecord, HealthStatus, AlertLevel } from "@/src/types";
+import { alerts as alertsData } from "@/src/data/dashboardMock";
 import { cn } from "@/src/lib/utils";
 
 export function Alerts() {
-  const [alerts, setAlerts] = useState<Alert[]>(alertsData as Alert[]);
+  const [alerts, setAlerts] = useState<AlertRecord[]>(alertsData);
   const [filter, setFilter] = useState<HealthStatus | "all">("all");
 
   const filteredAlerts = alerts.filter(a => filter === "all" || a.severity === filter);
@@ -23,7 +23,7 @@ export function Alerts() {
       <div className="flex justify-between items-end">
         <div>
           <h2 className="text-2xl font-semibold text-slate-900">Centre des alertes</h2>
-          <p className="text-sm text-slate-600 mt-1">Activite reseau en temps reel</p>
+          <p className="text-sm text-slate-600 mt-1">Activité réseau en temps réel</p>
         </div>
         <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors duration-150">
           <Download size={14} /> Exporter Rapport
@@ -45,7 +45,7 @@ export function Alerts() {
       <div className="bg-white border border-slate-200 rounded-md overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center">
             <h3 className="text-base font-semibold text-slate-900">Flux des incidents</h3>
-            <span className="text-sm text-slate-600">{filteredAlerts.length} elements detectes</span>
+            <span className="text-sm text-slate-600">{filteredAlerts.length} éléments détectés</span>
         </div>
         <div className="divide-y divide-slate-200">
           {filteredAlerts.map((alert) => (
@@ -62,11 +62,13 @@ export function Alerts() {
 
                   <div className="space-y-2">
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                      <span className="text-xs font-medium bg-slate-100 px-2 py-1 rounded text-slate-700">NODE: {alert.institution}</span>
+                      <span className="text-xs font-medium bg-slate-100 px-2 py-1 rounded text-slate-700">NODE: {alert.institutionCode}</span>
+                      <AlertTypeBadge type={alert.alertType} />
+                      <LevelBadge level={alert.level} />
                       <span className="text-xs text-slate-500">{alert.domain}</span>
                       <div className="flex items-center gap-1.5 text-slate-500">
                         <Clock size={12} />
-                        <span className="text-xs">{alert.time}</span>
+                        <span className="text-xs">{alert.ageLabel}</span>
                       </div>
                     </div>
 
@@ -94,7 +96,7 @@ export function Alerts() {
                         onClick={() => handleResolve(alert.id)}
                         className="px-3 py-1.5 bg-green-700 text-white text-sm font-medium rounded-md hover:bg-green-800 transition-colors duration-150"
                       >
-                        Resoudre
+                        Résoudre
                       </button>
                     )}
                   </div>
@@ -132,11 +134,40 @@ function FilterButton({ children, active, onClick, variant = "info" }: { childre
   );
 }
 
-function StatusBadge({ status }: { status: Alert['status'] }) {
+function AlertTypeBadge({ type }: { type: string }) {
+  const styles: Record<string, string> = {
+    THRESHOLD: 'bg-blue-50 text-blue-700 border-blue-200',
+    ANOMALY: 'bg-purple-50 text-purple-700 border-purple-200',
+    DOCUMENT: 'bg-slate-50 text-slate-700 border-slate-200',
+    PREDICTIVE: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+    COMPLIANCE: 'bg-amber-50 text-amber-700 border-amber-200',
+  };
+  return (
+    <span className={cn('px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide border', styles[type] || styles.THRESHOLD)}>
+      {type}
+    </span>
+  );
+}
+
+function LevelBadge({ level }: { level: AlertLevel }) {
+  const styles: Record<string, string> = {
+    INFO: 'bg-blue-50 text-blue-600',
+    WARNING: 'bg-amber-50 text-amber-600',
+    CRITICAL: 'bg-red-50 text-red-600',
+    PREDICTIVE: 'bg-indigo-50 text-indigo-600',
+  };
+  return (
+    <span className={cn('px-1.5 py-0.5 rounded text-[10px] font-semibold', styles[level])}>
+      {level}
+    </span>
+  );
+}
+
+function StatusBadge({ status }: { status: AlertRecord['status'] }) {
   const configs = {
     pending: { label: "En attente", style: "bg-slate-100 text-slate-700 border border-slate-200" },
     in_progress: { label: "En cours", style: "bg-blue-50 text-blue-800 border border-blue-200" },
-    resolved: { label: "Resolu", style: "bg-green-50 text-green-800 border border-green-200" }
+    resolved: { label: "Résolu", style: "bg-green-50 text-green-800 border border-green-200" }
   };
   const config = configs[status];
   return (

@@ -22,9 +22,9 @@ export function StatusDot({ status, animate = false }: { status: HealthStatus, a
 export function Badge({ children, variant = "info" }: { children: React.ReactNode, variant?: HealthStatus | "info" | "purple" | "amber" }) {
   const styles: Record<string, string> = {
     info: "bg-blue-50 text-blue-700",
-    good: "bg-status-good-bg text-status-good",
-    warning: "bg-status-medium-bg text-status-medium",
-    critical: "bg-status-critical-bg text-status-critical",
+    good: "bg-green-50 text-green-700",
+    warning: "bg-amber-50 text-amber-700",
+    critical: "bg-red-50 text-red-700",
     purple: "bg-slate-100 text-slate-700",
     amber: "bg-amber-100 text-amber-700"
   };
