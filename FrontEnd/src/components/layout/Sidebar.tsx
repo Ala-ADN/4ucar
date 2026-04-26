@@ -1,10 +1,10 @@
 import {
   LayoutDashboard,
   School,
-  Map as MapIcon,
+  FileCheck,
   Bell,
-  BarChart3,
-  Trophy,
+  FileText,
+  Wallet,
   Settings,
   User,
   ChevronLeft,
@@ -15,12 +15,12 @@ import { useAppStore } from '@/src/store';
 import { cn } from '@/src/lib/utils';
 
 const navItems = [
-  { icon: LayoutDashboard, label: 'Vue d\'ensemble', path: '/' },
-  { icon: School, label: 'Établissements', path: '/institutions' },
-  { icon: MapIcon, label: 'Carte interactive', path: '/carte' },
-  { icon: Bell, label: 'Alertes', path: '/alertes', badge: 8 },
-  { icon: BarChart3, label: 'Analytiques', path: '/analytiques' },
-  { icon: Trophy, label: 'Classements', path: '/classements' },
+  { icon: LayoutDashboard, label: 'Tableau KPI', path: '/' },
+  { icon: School, label: 'Etablissements', path: '/institutions' },
+  { icon: FileCheck, label: 'Conventions', path: '/conventions' },
+  { icon: Wallet, label: 'Finance', path: '/finance' },
+  { icon: Bell, label: 'Alertes & conformité', path: '/alertes', badge: 8 },
+  { icon: FileText, label: 'Rapports', path: '/reports' },
 ];
 
 export function Sidebar() {
@@ -29,7 +29,7 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        'bg-slate-900 border-r border-slate-700 h-screen sticky top-0 flex flex-col flex-shrink-0 z-50 transition-[width] duration-150',
+        'bg-slate-900 border-r border-slate-700 h-screen sticky top-0 flex flex-col shrink-0 z-50 transition-[width] duration-150',
         sidebarCollapsed ? 'w-16' : 'w-64'
       )}
     >
@@ -114,7 +114,7 @@ export function Sidebar() {
           'flex items-center gap-3 bg-slate-800 p-2 rounded-md',
           sidebarCollapsed && "justify-center"
         )}>
-          <div className="w-8 h-8 rounded-full bg-slate-700 flex-shrink-0 flex items-center justify-center text-slate-200 font-semibold text-xs">
+          <div className="w-8 h-8 rounded-full bg-slate-700 shrink-0 flex items-center justify-center text-slate-200 font-semibold text-xs">
             BS
           </div>
           {!sidebarCollapsed && (

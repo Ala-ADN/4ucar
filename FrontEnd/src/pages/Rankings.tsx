@@ -1,164 +1,89 @@
-import { Trophy, TrendingUp, TrendingDown, Minus, Users } from "lucide-react";
-import { useState } from "react";
-import { Institution } from "@/src/types";
-import institutionsData from "@/src/data/institutions.json";
-import { cn } from "@/src/lib/utils";
+import institutionsData from '@/src/data/institutions.json';
+import { Institution } from '@/src/types';
+
+interface FinanceRow {
+  code: string;
+  name: string;
+  budget_alloue_tnd: number;
+  budget_execute_tnd: number;
+  payroll_ratio: number;
+  external_funding_tnd: number;
+}
+
+const financeRows: FinanceRow[] = [
+  { code: 'EPT', name: 'Ecole Polytechnique de Tunisie', budget_alloue_tnd: 9100000, budget_execute_tnd: 7370000, payroll_ratio: 65.4, external_funding_tnd: 620000 },
+  { code: 'INSAT', name: 'INSAT', budget_alloue_tnd: 8200000, budget_execute_tnd: 5576000, payroll_ratio: 71.2, external_funding_tnd: 320000 },
+  { code: 'ENSTAB', name: 'ENSTAB', budget_alloue_tnd: 4200000, budget_execute_tnd: 1974000, payroll_ratio: 74.1, external_funding_tnd: 85000 },
+  { code: 'FST', name: 'FST', budget_alloue_tnd: 15000000, budget_execute_tnd: 10950000, payroll_ratio: 69.1, external_funding_tnd: 470000 },
+  { code: 'FSEG', name: 'FSEG', budget_alloue_tnd: 13600000, budget_execute_tnd: 10336000, payroll_ratio: 67.8, external_funding_tnd: 260000 },
+];
 
 export function Rankings() {
-  const [mode, setMode] = useState<'national' | 'intl'>('national');
-  const institutions = (institutionsData as Institution[]).sort((a, b) => (b.ranking_national || 100) - (a.ranking_national || 100)).reverse();
+  const institutions = institutionsData as Institution[];
+  const totalBudget = financeRows.reduce((acc, row) => acc + row.budget_alloue_tnd, 0);
+  const totalExecuted = financeRows.reduce((acc, row) => acc + row.budget_execute_tnd, 0);
+  const executionRate = ((totalExecuted / totalBudget) * 100).toFixed(1);
+  const meanPayroll = (
+    financeRows.reduce((acc, row) => acc + row.payroll_ratio, 0) / financeRows.length
+  ).toFixed(1);
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-end">
-        <div>
-          <h2 className="text-2xl font-semibold text-slate-900">Classements des etablissements</h2>
-          <p className="text-sm text-slate-600 mt-1">Production d'etudes comparatives 2024</p>
-        </div>
-        
-        <div className="flex bg-white p-1 border border-slate-300 rounded-md">
-          <button 
-            onClick={() => setMode('national')}
-            className={cn('px-4 py-1.5 rounded text-sm font-medium transition-colors duration-150', mode === 'national' ? 'bg-blue-800 text-white' : 'text-slate-700 hover:bg-slate-100')}
-          >
-            National
-          </button>
-          <button 
-            onClick={() => setMode('intl')}
-            className={cn('px-4 py-1.5 rounded text-sm font-medium transition-colors duration-150', mode === 'intl' ? 'bg-blue-800 text-white' : 'text-slate-700 hover:bg-slate-100')}
-          >
-            International
-          </button>
-        </div>
+      <div>
+        <h2 className="text-xl font-semibold text-slate-900">Suivi financier UCAR</h2>
+        <p className="text-sm text-slate-600 mt-1">Execution budgetaire et soutenabilite par etablissement</p>
       </div>
 
-      {mode === 'national' ? (
-        <div className="bg-white border border-slate-200 rounded-md overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center">
-            <h3 className="text-base font-semibold text-slate-900">Index de performance tunisien</h3>
-            <span className="text-sm text-slate-600">Derniere sync: 14:02 UTC</span>
-          </div>
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50">
-                <th className="px-6 py-3 text-xs font-semibold text-slate-700 border-b border-slate-200 text-center w-24">Rang</th>
-                <th className="px-6 py-3 text-xs font-semibold text-slate-700 border-b border-slate-200">Etablissement</th>
-                <th className="px-6 py-3 text-xs font-semibold text-slate-700 border-b border-slate-200">Score</th>
-                <th className="px-4 py-3 text-xs font-semibold text-slate-700 border-b border-slate-200 text-center">Statut domaines</th>
-                <th className="px-6 py-3 text-xs font-semibold text-slate-700 border-b border-slate-200 text-right">Momentum</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-slate-200">
-              {institutions.map((inst, idx) => (
-                <tr key={inst.code} className="hover:bg-slate-50 transition-colors duration-150">
-                  <td className={cn(
-                    'px-6 py-4 text-center font-semibold font-tabular text-base',
-                    idx === 0 ? 'text-amber-700 bg-amber-50' :
-                    idx === 1 ? 'text-slate-600 bg-slate-50' :
-                    idx === 2 ? 'text-amber-800 bg-amber-50/50' : 'text-slate-500'
-                  )}>
-                    {idx + 1}
-                  </td>
-                  <td className="px-6 py-5">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-700 font-mono text-xs font-medium">
-                        {inst.code}
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium text-slate-900">{inst.name}</span>
-                        <span className="text-xs text-slate-500">{inst.city}</span>
-                      </div>
+      <section className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-white border border-slate-200 rounded-md p-4">
+          <p className="text-sm text-slate-600">Budget reseau alloue</p>
+          <p className="text-2xl font-semibold text-slate-900 mt-2">{Math.round(totalBudget / 1000000)} M TND</p>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-md p-4">
+          <p className="text-sm text-slate-600">Execution globale</p>
+          <p className="text-2xl font-semibold text-slate-900 mt-2">{executionRate}%</p>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-md p-4">
+          <p className="text-sm text-slate-600">Masse salariale moyenne</p>
+          <p className="text-2xl font-semibold text-slate-900 mt-2">{meanPayroll}%</p>
+        </div>
+      </section>
+
+      <section className="bg-white border border-slate-200 rounded-md overflow-hidden">
+        <table className="w-full text-left">
+          <thead className="bg-slate-50 border-b border-slate-200">
+            <tr>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-700">Etablissement</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-700 text-right">Alloue (TND)</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-700 text-right">Execute (TND)</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-700 text-right">Execution</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-700 text-right">Masse salariale</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-700 text-right">Financement externe</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-200">
+            {financeRows.map((row) => {
+              const execution = (row.budget_execute_tnd / row.budget_alloue_tnd) * 100;
+              const inst = institutions.find((i) => i.code === row.code);
+              return (
+                <tr key={row.code} className="hover:bg-slate-50">
+                  <td className="px-4 py-3 text-sm text-slate-800">
+                    <div className="flex flex-col">
+                      <span className="font-medium text-slate-900">{row.code}</span>
+                      <span className="text-xs text-slate-500">{inst?.city || row.name}</span>
                     </div>
                   </td>
-                  <td className="px-6 py-5">
-                    <ScoreBadge score={92 - idx * 4} />
-                  </td>
-                  <td className="px-4 py-5">
-                    <div className="flex justify-center gap-3">
-                      <ScoreDot status={inst.health.academic} label="Acad." />
-                      <ScoreDot status={inst.health.financial} label="Fin." />
-                      <ScoreDot status={inst.health.hr} label="RH" />
-                      <ScoreDot status={inst.health.research} label="Rech." />
-                    </div>
-                  </td>
-                  <td className="px-8 py-5 text-right">
-                    <div className="flex items-center justify-end gap-2 pr-2">
-                       <span className={cn(
-                         'text-xs font-medium',
-                         idx < 3 ? 'text-green-700' : (idx > 12 ? 'text-red-700' : 'text-slate-500')
-                       )}>
-                         {idx < 3 ? 'BULLISH' : (idx > 12 ? 'BEARISH' : 'STABLE')}
-                       </span>
-                       <TrendIcon trend={idx < 3 ? 'up' : (idx > 12 ? 'down' : 'stable')} />
-                    </div>
-                  </td>
+                  <td className="px-4 py-3 text-sm text-right font-tabular text-slate-800">{row.budget_alloue_tnd.toLocaleString('fr-FR')}</td>
+                  <td className="px-4 py-3 text-sm text-right font-tabular text-slate-800">{row.budget_execute_tnd.toLocaleString('fr-FR')}</td>
+                  <td className="px-4 py-3 text-sm text-right font-tabular text-slate-900">{execution.toFixed(1)}%</td>
+                  <td className="px-4 py-3 text-sm text-right font-tabular text-slate-800">{row.payroll_ratio.toFixed(1)}%</td>
+                  <td className="px-4 py-3 text-sm text-right font-tabular text-slate-800">{row.external_funding_tnd.toLocaleString('fr-FR')}</td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <IntlMetric icon={Users} label="Partenariats actifs" value="142" suffix="Accords" trend="+12.4%" />
-          <IntlMetric icon={TrendingUp} label="Mobilité sortante" value="850" suffix="Étudiants" trend="+24.2%" />
-          <IntlMetric icon={Trophy} label="Publications" value="2.4k" suffix="Articles" trend="+8.1%" />
-          <div className="md:col-span-3 bg-white p-12 rounded-md border border-slate-200 border-dashed text-center">
-             <Trophy size={40} className="mx-auto text-slate-400 mb-4" />
-             <p className="text-slate-600 font-medium text-sm">Donnees internationales en synchronisation (THE/QS)</p>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ScoreBadge({ score }: { score: number }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-       <div className="flex justify-between items-center w-24">
-       <span className="text-xs font-semibold text-slate-900 tabular-nums">{score}</span>
-       <span className="text-[10px] font-medium text-slate-500">/100</span>
-       </div>
-       <div className="w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-          <div 
-         className={cn("h-full rounded-full", score > 80 ? "bg-blue-700" : "bg-slate-700")} 
-             style={{ width: `${score}%` }} 
-          />
-       </div>
-    </div>
-  );
-}
-
-function ScoreDot({ status, label }: { status: string, label: string }) {
-  const color = status === 'good' ? 'bg-green-600' : (status === 'warning' ? 'bg-amber-500' : 'bg-red-600');
-  return (
-    <div className="flex flex-col items-center gap-1.5" title={label}>
-      <div className={cn("w-2 h-2 rounded-full", color)} />
-      <span className="text-[10px] font-medium text-slate-500">{label}</span>
-    </div>
-  );
-}
-
-function TrendIcon({ trend }: { trend: 'up' | 'down' | 'stable' }) {
-  if (trend === 'up') return <TrendingUp size={14} className="text-green-600" />;
-  if (trend === 'down') return <TrendingDown size={14} className="text-red-500" />;
-  return <Minus size={14} className="text-slate-300" />;
-}
-
-function IntlMetric({ icon: Icon, label, value, suffix, trend }: { icon: any, label: string, value: string, suffix: string, trend: string }) {
-  return (
-    <div className="bg-white p-6 rounded-md border border-slate-200">
-      <div className="flex justify-between items-start mb-6">
-        <div className="p-2 bg-slate-100 border border-slate-200 rounded text-slate-700">
-          <Icon size={20} />
-        </div>
-        <span className="text-xs font-medium text-green-800 bg-green-50 px-2 py-1 rounded border border-green-100">{trend}</span>
-      </div>
-      <h3 className="text-sm font-medium text-slate-700">{label}</h3>
-      <div className="flex items-baseline gap-2 mt-2">
-        <span className="text-3xl font-semibold text-slate-900 tabular-nums">{value}</span>
-        <span className="text-xs font-medium text-slate-600">{suffix}</span>
-      </div>
+              );
+            })}
+          </tbody>
+        </table>
+      </section>
     </div>
   );
 }

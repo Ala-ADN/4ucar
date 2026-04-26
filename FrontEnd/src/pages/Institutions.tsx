@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, Filter } from "lucide-react";
+import { Search } from "lucide-react";
 import { Institution, InstitutionType } from "@/src/types";
 import institutionsData from "@/src/data/institutions.json";
 import { Badge } from "@/src/components/ui/StatusDot";
@@ -33,7 +33,7 @@ export function Institutions() {
       </div>
 
       <div className="bg-white p-4 rounded-md flex flex-wrap items-center gap-4 border border-slate-200">
-        <div className="relative flex-1 min-w-[240px]">
+        <div className="relative flex-1 min-w-60">
           <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input 
             type="text" 
@@ -57,16 +57,13 @@ export function Institutions() {
           </select>
         </div>
 
-        <button className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-md transition-colors duration-150 border border-slate-200">
-          <Filter size={16} /> Filters
-        </button>
       </div>
 
       <div className="bg-white border border-slate-200 rounded-md overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center">
             <h3 className="text-base font-semibold text-slate-900">Registre des etablissements</h3>
             <div className="flex items-center gap-4">
-               <span className="text-sm text-blue-800 border-b border-blue-800 cursor-pointer">Exporter</span>
+               <span className="text-sm text-slate-600">{filteredInstitutions.length} lignes</span>
             </div>
         </div>
         <div className="overflow-x-auto">
@@ -76,7 +73,9 @@ export function Institutions() {
                 <th className="px-6 py-3 text-xs font-semibold text-slate-700 border-b border-slate-200">ID systeme</th>
                 <th className="px-6 py-3 text-xs font-semibold text-slate-700 border-b border-slate-200">Etablissement</th>
                 <th className="px-6 py-3 text-xs font-semibold text-slate-700 border-b border-slate-200">Type</th>
-                <th className="px-6 py-3 text-xs font-semibold text-slate-700 border-b border-slate-200 text-center">Score</th>
+                <th className="px-6 py-3 text-xs font-semibold text-slate-700 border-b border-slate-200 text-right">Reussite</th>
+                <th className="px-6 py-3 text-xs font-semibold text-slate-700 border-b border-slate-200 text-right">Abandon</th>
+                <th className="px-6 py-3 text-xs font-semibold text-slate-700 border-b border-slate-200 text-right">Budget</th>
                 <th className="px-6 py-3 text-xs font-semibold text-slate-700 border-b border-slate-200 text-right">Actions</th>
               </tr>
             </thead>
@@ -100,11 +99,9 @@ export function Institutions() {
                       {inst.type.replace('_', ' ')}
                     </Badge>
                   </td>
-                  <td className="px-6 py-4">
-                    <div className="flex justify-center">
-                      <ScoreValue value={inst.kpi_snapshot?.taux_reussite ?? 0} />
-                    </div>
-                  </td>
+                  <td className="px-6 py-4 text-sm text-right font-tabular text-slate-900">{inst.kpi_snapshot?.taux_reussite ?? 0}%</td>
+                  <td className="px-6 py-4 text-sm text-right font-tabular text-slate-700">{inst.kpi_snapshot?.taux_abandon ?? 0}%</td>
+                  <td className="px-6 py-4 text-sm text-right font-tabular text-slate-700">{inst.kpi_snapshot?.budget_execution ?? 0}%</td>
                   <td className="px-6 py-4 text-right">
                     <Link 
                       to={`/institutions/${inst.code}`}
@@ -118,20 +115,6 @@ export function Institutions() {
             </tbody>
           </table>
         </div>
-      </div>
-    </div>
-  );
-}
-
-function ScoreValue({ value }: { value: number }) {
-  return (
-    <div className="flex flex-col items-center gap-1">
-      <span className="text-sm font-semibold text-slate-900 font-tabular">{value}%</span>
-      <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-        <div 
-          className={cn("h-full rounded-full", value > 80 ? "bg-green-600" : "bg-blue-700")} 
-          style={{ width: `${value}%` }} 
-        />
       </div>
     </div>
   );

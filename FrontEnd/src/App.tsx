@@ -21,10 +21,10 @@ export default function App() {
           <Route path="/" element={<Overview />} />
           <Route path="/institutions" element={<Institutions />} />
           <Route path="/institutions/:code" element={<InstitutionDetail />} />
-          <Route path="/carte" element={<MapView />} />
+          <Route path="/conventions" element={<MapView />} />
           <Route path="/alertes" element={<Alerts />} />
-          <Route path="/analytiques" element={<Analytics />} />
-          <Route path="/classements" element={<Rankings />} />
+          <Route path="/reports" element={<Analytics />} />
+          <Route path="/finance" element={<Rankings />} />
         </Route>
       </Routes>
     </BrowserRouter>

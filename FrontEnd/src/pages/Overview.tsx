@@ -63,7 +63,7 @@ export function Overview() {
             </button>
           </div>
 
-          <div className="h-[280px] w-full">
+          <div className="h-70 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={trendData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
@@ -122,7 +122,7 @@ export function Overview() {
                   <div className={alert.severity === 'critical' ? 'w-2 h-2 rounded-full bg-red-600 mt-1.5' : 'w-2 h-2 rounded-full bg-amber-500 mt-1.5'} />
                   <div className="flex flex-col">
                     <span className="text-sm font-medium text-slate-900">{alert.institution}</span>
-                    <span className="text-xs text-slate-600 truncate max-w-[180px]">{alert.title}</span>
+                    <span className="text-xs text-slate-600 truncate max-w-45">{alert.title}</span>
                   </div>
                 </div>
                 <span className="text-xs font-medium text-slate-500">{alert.time}</span>

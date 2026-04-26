@@ -9,13 +9,13 @@ export function AppShell() {
   return (
     <div className="flex h-screen w-full bg-slate-50 overflow-hidden text-gray-900">
       {/* Fixed Sidebar */}
-      <aside className="flex-shrink-0 z-20">
+      <aside className="shrink-0 z-20">
         <Sidebar />
       </aside>
 
       {/* Main Content Area */}
       <div className="flex flex-col flex-1 min-w-0">
-        <header className="flex-shrink-0 z-10">
+        <header className="shrink-0 z-10">
           <Topbar />
         </header>
 

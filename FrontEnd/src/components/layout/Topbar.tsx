@@ -2,17 +2,18 @@ import { Bell, Search, User } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 
 const pageTitles: Record<string, string> = {
-  '/': 'Vue d\'ensemble',
+  '/': 'Tableau KPI UCAR',
   '/institutions': 'Établissements',
-  '/carte': 'Carte interactive',
-  '/alertes': 'Centre d\'alertes',
-  '/analytiques': 'Explorateur KPI',
-  '/classements': 'Classements'
+  '/conventions': 'Gestion des conventions',
+  '/finance': 'Suivi financier',
+  '/alertes': 'Alertes et conformité',
+  '/reports': 'Rapports et analyses'
 };
 
 export function Topbar() {
   const location = useLocation();
-  const title = pageTitles[location.pathname] || 'Tableau de bord';
+  const isInstitutionDetail = location.pathname.startsWith('/institutions/');
+  const title = isInstitutionDetail ? 'Fiche et pilotage institution' : (pageTitles[location.pathname] || 'Tableau de bord');
 
   return (
     <header className="h-16 bg-white border-b border-slate-200 px-6 lg:px-8 flex items-center justify-between sticky top-0 z-40">

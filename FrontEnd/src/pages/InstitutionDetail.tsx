@@ -96,7 +96,7 @@ export function InstitutionDetail() {
             </div>
           </div>
 
-          <div className="flex flex-col gap-4 min-w-[240px]">
+          <div className="flex flex-col gap-4 min-w-60">
             <div className="bg-slate-50 p-3 rounded border border-slate-200 grid grid-cols-4 gap-2">
               <HealthDot label="Acad." status={institution.health.academic} />
               <HealthDot label="Fin." status={institution.health.financial} />
