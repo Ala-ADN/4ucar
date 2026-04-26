@@ -128,11 +128,7 @@ The University of Carthage (UCAR) oversees 35 affiliated institutions operating 
 
 ### 2.3 Multi-Tenancy Model
 
-Each institution is a **tenant**. Tenancy is enforced at three levels:
-
-1. **Database**: Separate PostgreSQL schema per tenant (`tenant_{institution_code}`). Shared schema for UCAR-level aggregates (`ucar_global`).
-2. **Application**: Every API handler extracts `tenant_id` from the authenticated JWT and injects it into all queries. No cross-tenant query is possible without the `GLOBAL_READ` permission.
-3. **Storage**: Garage bucket per tenant (`docs-{institution_code}`). Pre-signed URLs are scoped and expire after 15 minutes.
+Each institution is a **tenant** — separate PostgreSQL schema (`tenant_{code}`), JWT-injected `tenant_id` on every query, Garage bucket per institution. Cross-tenant reads require `GLOBAL_READ` permission. All writes are logged to an immutable `audit_log` table (`action`, `user_id`, `tenant_id`, `old_value`, `new_value`, `created_at`).
 
 ---
 
@@ -164,174 +160,60 @@ The KPI system is designed to simultaneously serve two masters:
 
 The following section defines the full KPI catalog with explicit ranking mappings and data sources.
 
-### 4.2 KPI Catalog — Filtered & Enriched
+### 4.2 KPI Catalog
 
-#### Filtering rationale applied to your draft
-
-The following proposed metrics were **removed** from the ranking-aligned set because they do not appear in any of QS (9 indicators), THE (13 indicators), or ARWU (6 indicators) methodologies and have no proxy relationship to them:
-
-- LinkedIn scraping for employment rate → replaced by formal survey-based Employability Index (QS Employment Outcomes, 5%)
-- ISO 21001 governance checkbox → retained as **internal compliance KPI only**, not ranking-contributing
-- Club activities / extracurricular → retained as **internal student life KPI**, not ranking-contributing
-- PFE / internship counts (alone) → absorbed into Employer Reputation proxy score
-- Lesson plan completion rate → internal quality KPI, no ranking proxy
-- Equipment maintenance compliance → internal operations KPI, no ranking proxy
-
-The following metrics were **added** based on ranking gap analysis:
-
-- H-index per faculty (QS Citations per Faculty, 20%)
-- International faculty ratio (QS, 5%)
-- International student ratio (QS, 5%)
-- International Research Network score — co-authorship breadth (QS, 5%)
-- Doctorates-awarded-to-academic-staff ratio (THE Teaching, 6%)
-- Institutional research income (THE Research, 6%)
-- Nobel/Fields Medal affiliations (ARWU, 30%) — tracked as binary, expected zero for UCAR; included for completeness
-- Sustainability score composite (QS, 5%; THE, 7.5%)
-
----
-
-#### KPI Catalog — Full Definition
-
-Each KPI entry specifies: ID, name, domain, formula or data source, ranking signal (QS / THE / ARWU), internal weight, computation frequency, and data owner.
-
----
-
-##### DOMAIN A — Research & Citations
-
-_QS weight: Citations per Faculty 20% + International Research Network 5% | THE: Research 30% + Citations 30% | ARWU: Publications 20% + HiCi 20%_
-
-| KPI ID   | Name                                 | Formula / Source                                                          | Ranking Signal               | Frequency |
-| -------- | ------------------------------------ | ------------------------------------------------------------------------- | ---------------------------- | --------- |
-| `RES-01` | Citations per Faculty                | Total Scopus/WoS citations (5yr) ÷ number of full-time equivalent faculty | **QS 20% · THE 30%**         | Annual    |
-| `RES-02` | H-index (faculty median)             | Median h-index of all active faculty (Scopus)                             | QS proxy · THE proxy         | Annual    |
-| `RES-03` | Publications per Faculty             | Peer-reviewed publications (5yr) ÷ FTE faculty                            | THE Research 6%              | Annual    |
-| `RES-04` | International Research Network Score | % of publications with at least one international co-author               | **QS 5%**                    | Annual    |
-| `RES-05` | Funded R&D Projects                  | Count of externally funded research projects (active)                     | THE Research income 6%       | Semester  |
-| `RES-06` | Research Income per Faculty          | Total external research funding (TND) ÷ FTE faculty                       | THE Research income 6%       | Annual    |
-| `RES-07` | PhD Students per Faculty             | Active doctoral students ÷ FTE faculty                                    | THE Teaching (DoctoralRatio) | Semester  |
-| `RES-08` | Doctorates Awarded Ratio             | Doctorates awarded per year ÷ FTE academic staff                          | **THE Teaching 6%**          | Annual    |
-| `RES-09` | High-Citation Papers (top 1%)        | Count of papers in top 1% by citations in their field (Scopus)            | THE Citations 30%            | Annual    |
-| `RES-10` | Consultancy Revenue                  | Revenue from consultancy and knowledge transfer (TND)                     | THE Research income          | Annual    |
-| `RES-11` | Open Access Publication Rate         | % of publications available open access                                   | Sustainability proxy         | Annual    |
-
----
+Demo scope: KPIs that feed the three accreditation frameworks in scope — **ISO 9001**, **ISO 21001**, **UI GreenMetric**. Research, Employability, Internationalization, and Finance domains are deferred.
 
 ##### DOMAIN B — Academic Quality & Teaching
+_ISO 21001: clause 8.2 (student performance), 8.3 (curriculum design), 9.1 (monitoring)_
 
-_QS: Faculty/Student Ratio 20% | THE: Teaching 30% (staff-to-student, doctorate ratio)_
-
-| KPI ID   | Name                                   | Formula / Source                                                        | Ranking Signal                | Frequency |
-| -------- | -------------------------------------- | ----------------------------------------------------------------------- | ----------------------------- | --------- |
-| `ACA-01` | Student-Faculty Ratio                  | Total enrolled students ÷ FTE academic staff                            | **QS 20% · THE 4.5%**         | Semester  |
-| `ACA-02` | Success Rate                           | Students who passed all modules ÷ total enrolled (per cohort)           | Internal · THE Teaching proxy | Semester  |
-| `ACA-03` | Dropout Rate                           | Students who withdrew without graduating ÷ cohort size                  | Internal governance           | Semester  |
-| `ACA-04` | Repetition Rate                        | Students repeating a year ÷ total enrolled                              | Internal governance           | Semester  |
-| `ACA-05` | Curriculum Coverage Rate               | Actual delivered hours ÷ minimum required hours per module (%)          | ISO 21001 · Internal          | Semester  |
-| `ACA-06` | Faculty with PhDs (%)                  | Faculty holding doctoral degree ÷ total faculty                         | THE Teaching · QS regional    | Annual    |
-| `ACA-07` | Double Degree Programs                 | Count of active double-degree agreements with foreign institutions      | Internationalization proxy    | Annual    |
-| `ACA-08` | Professional Certifications (students) | Students holding industry certifications ÷ enrolled                     | Employability proxy           | Annual    |
-| `ACA-09` | Accredited Programs                    | Programs holding external accreditation ÷ total programs                | Internal quality              | Annual    |
-| `ACA-10` | Average Grade Performance Index        | Mean GPA / weighted exam score across institution                       | Internal governance           | Semester  |
-| `ACA-11` | Absenteeism Rate (students)            | Unexcused absences ÷ total class hours                                  | Internal governance           | Monthly   |
-| `ACA-12` | Weak Student Remediation Rate          | At-risk students receiving formal support ÷ identified at-risk students | ISO 21001                     | Semester  |
-
----
-
-##### DOMAIN C — Employability & Industry Relations
-
-_QS: Employer Reputation 10% + Employment Outcomes 5% | THE: Industry Income 2.5%_
-
-| KPI ID   | Name                                   | Formula / Source                                                            | Ranking Signal            | Frequency |
-| -------- | -------------------------------------- | --------------------------------------------------------------------------- | ------------------------- | --------- |
-| `EMP-01` | Graduate Employment Rate               | Graduates employed within 12 months ÷ graduates surveyed                    | **QS 10%+5%**             | Annual    |
-| `EMP-02` | Employer Reputation Score              | Weighted score from employer survey responses (structured survey)           | **QS 10%**                | Annual    |
-| `EMP-03` | Time to First Employment               | Median months from graduation to first job (survey)                         | QS Employment Outcomes    | Annual    |
-| `EMP-04` | Industry Partnership Count             | Active formal agreements with private sector entities                       | THE Industry Income proxy | Annual    |
-| `EMP-05` | Internship Placement Rate              | Students completing required internships ÷ enrolled final-year students     | Internal · QS EO proxy    | Semester  |
-| `EMP-06` | PFE (Final Year Project) Industry Rate | PFE projects hosted by industry ÷ total PFE                                 | Internal governance       | Annual    |
-| `EMP-07` | Alumni Engagement Rate                 | Alumni responding to survey or participating in events ÷ total alumni (5yr) | QS EO proxy               | Annual    |
-| `EMP-08` | Career Services Utilization            | Students using career center services ÷ enrolled                            | Internal governance       | Semester  |
-
----
-
-##### DOMAIN D — Internationalization
-
-_QS: International Faculty Ratio 5% + International Student Ratio 5% + International Research Network 5%_
-
-| KPI ID   | Name                                 | Formula / Source                                                   | Ranking Signal       | Frequency |
-| -------- | ------------------------------------ | ------------------------------------------------------------------ | -------------------- | --------- |
-| `INT-01` | International Faculty Ratio          | Faculty with foreign nationality or foreign degree ÷ total faculty | **QS 5%**            | Annual    |
-| `INT-02` | International Student Ratio          | Students with foreign nationality ÷ total enrolled                 | **QS 5%**            | Semester  |
-| `INT-03` | Outgoing Student Mobility            | Students participating in exchange/Erasmus ÷ enrolled              | Internationalization | Annual    |
-| `INT-04` | Incoming Student Mobility            | Foreign students on exchange at institution ÷ enrolled             | Internationalization | Annual    |
-| `INT-05` | International Partnership Agreements | Active MOU/convention with foreign universities                    | QS IRN proxy         | Annual    |
-| `INT-06` | Foreign Language Program Rate        | Programs taught fully or partially in a foreign language ÷ total   | Internationalization | Annual    |
-
----
-
-##### DOMAIN E — Finance & Resources
-
-_THE: Industry Income 2.5% · Institutional Income 2.25% | Internal governance_
-
-| KPI ID   | Name                          | Formula / Source                                            | Ranking Signal            | Frequency |
-| -------- | ----------------------------- | ----------------------------------------------------------- | ------------------------- | --------- |
-| `FIN-01` | Budget Execution Rate         | Actual expenditure ÷ allocated budget (%)                   | Internal governance       | Monthly   |
-| `FIN-02` | Cost per Student              | Total operating expenditure ÷ enrolled students             | Internal governance       | Annual    |
-| `FIN-03` | Research Funding Ratio        | External research funding ÷ total budget                    | THE Research Income proxy | Annual    |
-| `FIN-04` | Revenue Diversification Index | Non-public-funding revenue ÷ total revenue                  | Internal governance       | Annual    |
-| `FIN-05` | Inventory Utilization Rate    | Assets in active use ÷ total registered assets              | Internal operations       | Semester  |
-| `FIN-06` | Project Budget Compliance     | Projects delivered within budget ÷ total completed projects | Internal governance       | Annual    |
-| `FIN-07` | Payroll Accuracy Rate         | Payslips issued without correction ÷ total payslips         | Internal HR               | Monthly   |
-
----
-
-##### DOMAIN F — Human Resources
-
-_THE: Teaching (staff-to-student) · QS: Faculty/Student Ratio | Internal governance_
-
-| KPI ID  | Name                                   | Formula / Source                                                    | Ranking Signal      | Frequency |
-| ------- | -------------------------------------- | ------------------------------------------------------------------- | ------------------- | --------- |
-| `HR-01` | Professor Workload Compliance Rate     | Faculty within ±20% of contracted hours ÷ total faculty             | Internal governance | Monthly   |
-| `HR-02` | Teaching Load Balance Index            | Std. deviation of hours across faculty (lower = better)             | Internal governance | Semester  |
-| `HR-03` | Professor-per-Student Ratio            | FTE faculty ÷ enrolled students (reciprocal of ACA-01 — same underlying metric, tracked separately for HR workload reporting) | Internal governance | Semester  |
-| `HR-04` | Administrative Staff per Student       | Admin FTE ÷ enrolled students                                       | Internal governance | Annual    |
-| `HR-05` | Faculty Training Fulfillment Rate      | Training hours completed ÷ training hours required                  | ISO 21001           | Annual    |
-| `HR-06` | Absenteeism Rate (staff)               | Unexcused absences ÷ scheduled days                                 | Internal governance | Monthly   |
-| `HR-07` | Vacancy Fill Time                      | Days from position open to contract signed                          | Internal HR         | Per-event |
-| `HR-08` | Permanent-to-Contractual Faculty Ratio | Permanent faculty ÷ total faculty                                   | Internal governance | Annual    |
-| `HR-09` | Faculty Expertise Match Rate           | Faculty whose specialization matches their assigned courses ÷ total | Internal quality    | Semester  |
+| KPI ID   | Name                          | Formula / Source                                                        | Framework       | Frequency |
+| -------- | ----------------------------- | ----------------------------------------------------------------------- | --------------- | --------- |
+| `ACA-01` | Student-Faculty Ratio         | Total enrolled students ÷ FTE academic staff                            | ISO 21001 8.1   | Semester  |
+| `ACA-02` | Success Rate                  | Students who passed all modules ÷ total enrolled (per cohort)           | ISO 21001 9.1   | Semester  |
+| `ACA-03` | Dropout Rate                  | Students who withdrew without graduating ÷ cohort size                  | ISO 21001 9.1   | Semester  |
+| `ACA-05` | Curriculum Coverage Rate      | Actual delivered hours ÷ minimum required hours per module (%)          | ISO 21001 8.3   | Semester  |
+| `ACA-12` | Weak Student Remediation Rate | At-risk students receiving formal support ÷ identified at-risk students | ISO 21001 8.2   | Semester  |
 
 ---
 
 ##### DOMAIN G — Sustainability & ESG
+_UI GreenMetric: Energy & Climate Change, Waste, Water, Transport, Education & Research, Setting & Infrastructure_
 
-_QS: Sustainability 5% | THE: Sustainability 7.5%_
-
-| KPI ID   | Name                           | Formula / Source                                            | Ranking Signal                 | Frequency |
-| -------- | ------------------------------ | ----------------------------------------------------------- | ------------------------------ | --------- |
-| `ESG-01` | Energy Consumption per Student | kWh consumed ÷ enrolled students                            | **QS/THE Sustainability**      | Monthly   |
-| `ESG-02` | Carbon Footprint per Student   | CO2e kg ÷ enrolled students                                 | **QS/THE Sustainability**      | Annual    |
-| `ESG-03` | Renewable Energy Rate          | Renewable energy consumed ÷ total energy consumed           | QS/THE Sustainability          | Annual    |
-| `ESG-04` | Recycling Rate                 | Waste recycled ÷ total waste generated                      | QS/THE Sustainability          | Annual    |
-| `ESG-05` | Green Transportation Rate      | Students/staff using sustainable transport ÷ total (survey) | QS/THE Sustainability          | Annual    |
-| `ESG-06` | Campus Accessibility Score     | Accessibility-compliant facilities ÷ total facilities       | QS/THE Sustainability (Social) | Annual    |
-| `ESG-07` | Gender Diversity Index         | Female faculty ÷ total faculty                              | QS/THE Sustainability (Social) | Annual    |
-| `ESG-08` | SDG-Aligned Research Rate      | Publications linked to UN SDGs ÷ total publications         | THE Sustainability             | Annual    |
+| KPI ID   | Name                           | Formula / Source                                            | GreenMetric Category          | Frequency |
+| -------- | ------------------------------ | ----------------------------------------------------------- | ----------------------------- | --------- |
+| `ESG-01` | Energy Consumption per Student | kWh consumed ÷ enrolled students                            | Energy & Climate Change       | Monthly   |
+| `ESG-02` | Carbon Footprint per Student   | CO2e kg ÷ enrolled students                                 | Energy & Climate Change       | Annual    |
+| `ESG-03` | Renewable Energy Rate          | Renewable energy consumed ÷ total energy consumed           | Energy & Climate Change       | Annual    |
+| `ESG-04` | Recycling Rate                 | Waste recycled ÷ total waste generated                      | Waste                         | Annual    |
+| `ESG-05` | Green Transportation Rate      | Students/staff using sustainable transport ÷ total (survey) | Transport                     | Annual    |
+| `ESG-06` | Campus Accessibility Score     | Accessibility-compliant facilities ÷ total facilities       | Setting & Infrastructure      | Annual    |
+| `ESG-07` | Gender Diversity Index         | Female faculty ÷ total faculty                              | Education & Research          | Annual    |
+| `ESG-08` | SDG-Aligned Research Rate      | Publications linked to UN SDGs ÷ total publications         | Education & Research          | Annual    |
 
 ---
 
-##### DOMAIN H — Governance & Compliance (Internal only)
+##### DOMAIN H — Governance & Compliance
+_ISO 9001 + ISO 21001 alignment_
 
-_ISO 21001:2018 alignment — no direct ranking contribution but required for accreditation_
+| KPI ID   | Name                                  | Formula / Source                                                      | Framework          | Frequency |
+| -------- | ------------------------------------- | --------------------------------------------------------------------- | ------------------ | --------- |
+| `GOV-01` | Document Control Compliance           | Controlled documents current ÷ total controlled documents             | ISO 9001 7.5       | Monthly   |
+| `GOV-02` | Internal Audit NCR Closure Rate       | Closed non-conformances ÷ total NCRs raised (90-day window)           | ISO 9001 9.2       | Quarterly |
+| `GOV-03` | Governance Meeting Frequency          | Actual BOS/DAB/PAC meetings ÷ required meetings (per charter)         | ISO 21001 9.3      | Semester  |
+| `GOV-04` | Risk Register Currency                | Days since last risk register update (target: ≤ 30 days)             | ISO 9001 6.1       | Monthly   |
+| `GOV-05` | Stakeholder Feedback Action Rate      | Feedback items with closed action ÷ total feedback received           | ISO 21001 9.1      | Semester  |
+| `GOV-06` | Document Completeness Index           | Required institutional documents present and current ÷ total required | ISO 9001 7.5       | Monthly   |
 
-| KPI ID   | Name                                  | Formula / Source                                                      | Frequency |
-| -------- | ------------------------------------- | --------------------------------------------------------------------- | --------- |
-| `GOV-01` | ISO 21001 Document Control Compliance | Controlled documents current ÷ total controlled documents             | Monthly   |
-| `GOV-02` | Internal Audit NCR Closure Rate       | Closed non-conformances ÷ total NCRs raised (90-day window)           | Quarterly |
-| `GOV-03` | Governance Meeting Frequency          | Actual BOS/DAB/PAC meetings ÷ required meetings (per charter)         | Semester  |
-| `GOV-04` | Risk Register Currency                | Days since last risk register update (target: ≤ 30 days)              | Monthly   |
-| `GOV-05` | Stakeholder Feedback Action Rate      | Feedback items with closed action ÷ total feedback received           | Semester  |
-| `GOV-06` | Document Completeness Index           | Required institutional documents present and current ÷ total required | Monthly   |
+---
+
+##### DOMAIN F — Human Resources (ISO 21001-relevant subset)
+
+| KPI ID  | Name                         | Formula / Source                                                    | Framework     | Frequency |
+| ------- | ---------------------------- | ------------------------------------------------------------------- | ------------- | --------- |
+| `HR-01` | Workload Compliance Rate     | Faculty within ±20% of contracted hours ÷ total faculty             | ISO 21001 7.1 | Monthly   |
+| `HR-05` | Training Fulfillment Rate    | Training hours completed ÷ training hours required                  | ISO 21001 7.2 | Annual    |
+| `HR-09` | Faculty Expertise Match Rate | Faculty whose specialization matches their assigned courses ÷ total | ISO 21001 7.2 | Semester  |
 
 ---
 
@@ -747,109 +629,6 @@ Matching algorithm:
   4. Return ranked list with score breakdown
 ```
 
-#### Use case 2: Ambassador Program matching
-
-Identify professors best suited to represent UCAR in external academic networks:
-
-```
-Criteria:
-  - International publications (RES-04 contributor)
-  - Foreign language proficiency (from profile)
-  - Active international collaborations
-  - H-index above institution median
-  - No disciplinary flags
-
-Output: ranked list of "Ambassador Eligible" faculty per domain
-```
-
-#### Use case 3: Promotion eligibility
-
-```
-Permanent professor promotion criteria (per Tunisian statute):
-  - Years in current rank ≥ minimum tenure
-  - Hours delivered ≥ required (no deficit)
-  - Publications meeting threshold for target rank
-  - No pending disciplinary action
-
-System outputs: "Eligible for promotion" / "Eligible in N months" / "Not eligible: [reasons]"
-```
-
-### 6.4 Hiring Workflows
-
-#### Permanent Professor Hiring (UCAR/Ministry Concours)
-
-Current process: manual, opaque, error-prone. Digitalized flow:
-
-```
-Phase 1: Position Opening
-  - UCAR HR posts vacancy (institution, rank, specialization, N seats)
-  - System publishes to ministry platform (API integration)
-  - Deadline and test date configured
-
-Phase 2: Candidate Application
-  - Candidates upload dossier via public portal (no auth required)
-  - Dossier: CV, diplomas, publications list, identity document
-  - Auto-validation: required documents present? → flagged if not
-  - Dossier classified and stored in doc-service
-
-Phase 3: Eligibility Screening
-  - System auto-checks: degree level, years of experience (from CV NLP extraction)
-  - Ineligible candidates flagged with reason
-  - Eligible candidates admitted to written test phase
-
-Phase 4: Written Test & Results
-  - Test administered externally (paper or online)
-  - Results uploaded as document → doc-service extracts scores
-  - Candidates ranked by test score
-
-Phase 5: Institution Preference & Assignment
-  [This is the key automation target]
-
-  Current: manual negotiation after results
-
-  Automated:
-  - Passing candidates rank their preferred institutions (up to 4 choices)
-  - System runs stable matching algorithm (Gale-Shapley variant):
-    - Candidate preference list: their 4 choices in order
-    - Institution preference: ranked by test score + specialization match score
-  - Assignment output: each candidate matched to one institution or unmatched
-  - Human override possible: Dean can swap two matched candidates with audit log
-  - Assignments published and candidates notified automatically
-
-Phase 6: Contract Issuance
-  - HR uploads contract template → auto-filled with candidate and position data
-  - Contract sent for e-signature (DocuSign API or equivalent)
-  - Signed contract stored in doc-service, professor record created
-```
-
-#### Contractual Professor Hiring (Institution-managed)
-
-```
-Phase 1: Position Opening
-  - Institution HR posts vacancy in platform
-  - Publicly visible: title, required hours, specialization, compensation band
-
-Phase 2: Dossier Upload
-  - Candidates register and upload dossier
-  - Fields: CV, degrees, publications, reference letters, cover letter
-  - System auto-scores dossier: matching-score against position requirements
-  - HR sees ranked candidate list before interviews
-
-Phase 3: Interview Scheduling
-  - HR selects candidates for interview from ranked list
-  - Calendar integration: interview slots proposed, candidate confirms
-  - Interview outcomes recorded (pass/fail + notes)
-
-Phase 4: Selection & Offer
-  - HR selects candidate from interviewed pool (override of AI ranking possible)
-  - Offer letter auto-generated from template
-  - E-signature workflow
-
-Phase 5: Onboarding
-  - Professor record created automatically
-  - Required documents checklist sent to professor
-  - First-semester course assignments suggested by matching engine
-```
 
 ---
 
@@ -1011,76 +790,181 @@ Format: PDF (auto-generated, stored in doc-service, sent by email).
 
 ---
 
-## 9. Module 6 — Nice-to-Have Features
+## 9. Module 6 — Student Management & Teacher Assignment
 
-These features are explicitly lower priority but architecturally compatible with the core platform. They share the same data layer and services.
+> **Demo scope**: frontend only — no backend API for this module yet. Mock data drives all views.
 
-### 9.1 Automated Reports & Email Digests
+### 9.1 Purpose
 
-- **Weekly digest**: Every Monday 08:00 — KPI summary, top 3 alerts, rank delta. Sent to Dean (institution) and President (network).
-- **Monthly synthesis**: Full KPI report for each institution. PDF export. MESRS-compatible format.
-- **Annual ranking report**: Full UCAR network analysis. Predicted QS/THE bands. Trend analysis. Board-ready format.
-- **On-demand**: Any dashboard view exportable to PDF in one click (server-side rendering via Puppeteer/WeasyPrint).
+Centralise academic organisation: students, classes, teacher assignments, and schedules in one place. Currently managed per-institution in disparate Excel files. This module gives deans and administrative staff a live view of institutional structure and feeds KPIs ACA-01 through ACA-05, HR-01, HR-09.
 
-Implementation: Celery beat scheduler → `report-service` → Garage storage → email dispatch.
+### 9.2 Core Entities
 
-### 9.2 Framework Gap Analysis Report
+**Student**
+- Personal info: national ID, full name (fr + ar), DOB, gender, nationality
+- Academic info: program, cohort year, current level (L1/L2/L3/M1/M2/Doctorat)
+- Status: `enrolled` | `on_leave` | `graduated` | `withdrawn`
+- Linked grades, attendance records, and enrolled classes
 
-An on-demand and scheduled report that answers: "For a given accreditation target, what are the highest-priority gaps, and what actions would close them?"
+**Class (Section)**
+- Class code, name, program, academic year, semester
+- Enrolled students list
+- Assigned teacher + co-teacher (optional)
+- Schedule: day/time/room slots
+- Syllabus reference (links to a doc-service `syllabus` document)
+- Delivered hours vs. required hours (feeds ACA-05)
 
-- **Input**: Select framework (QS, THE, ISO 21001, MESRS) + scope (single institution or UCAR network)
-- **Output**: Ranked gap list
-  - Each gap = one control that is FAILING or NEEDS_EVIDENCE
-  - For each gap: current value, target threshold, delta, specific missing evidence (documents or KPI data), estimated effort category (Low / Medium / High)
-  - Sorted by: weight in framework × distance from threshold (highest-impact gaps first)
-- **Display**: Framework Gap Analysis panel on President and Dean dashboards
-- **Explainability**: "Citations per Faculty (QS weight 20%): current 2.3, threshold 5.0 — requires approved publication lists for 2023–2025 from 12 institutions currently missing data"
-- **Update frequency**: Recomputed on each KPI batch completion and on each new document approval
-- **Export**: PDF gap report in MESRS-compatible format, suitable for board presentation
+**Program**
+- Code, name, level (Licence/Master/Doctorat/Ingénieur), department
+- Required modules list per semester
+- Total credit hours
 
-### 9.3 Document Anomaly Detection
+**Schedule Slot**
+- Class + day_of_week + start_time + end_time + room + recurrence
+- Conflict detection: same teacher or same room at overlapping times
 
-(Architecturally part of doc-service — surfaced in Alerts)
+### 9.3 Teacher Assignment
 
-- **OCR failure detection**: Character confidence < threshold; layout recognition failure
-- **Human entry errors**: Values outside statistical range for document class
-- **Duplicate detection**: Near-identical documents submitted for different periods
-- **Tampering signals**: Metadata inconsistency (PDF creation date vs. claimed report date)
-- **Language inconsistency**: French document with embedded Arabic field values incorrectly OCR'd
-
-All anomalies surfaced in Alert module at WARNING level with document link and field annotation.
-
-### 9.4 Natural Language Queries
-
-Powered by `nlp-service` using RAG (Retrieval-Augmented Generation) over the Elasticsearch document index:
-
-**Example queries:**
-
-- "Quels sont les taux d'abandon par institution ce semestre ?"
-- "Compare le budget d'INSAT et d'IHEC sur les 3 dernières années."
-- "Montre-moi tous les PV de réunion du conseil scientifique de FSB depuis 2023."
-- "Which professors at ENICarthage are eligible for promotion this year?"
-- "What is the h-index distribution across UCAR research labs?"
-
-**Architecture:**
+Assignment is the act of attaching a professor to a class for a semester. It is separate from the professor's general profile (Module 3) — one professor can be assigned to multiple classes.
 
 ```
-User query
-    │
-    ▼
-Query classifier → intent: [kpi_query | document_search | comparison | narrative]
-    │
-    ├── kpi_query → SQL generation → PostgreSQL → response
-    ├── document_search → Elasticsearch search → top-k docs → LLM synthesis
-    ├── comparison → multi-institution KPI pull → LLM narrative
-    └── narrative → structured report generation
-    │
-    ▼
-Response generator (Claude API)
-  - Bilingual (fr/ar) response
-  - Cited sources: document IDs / KPI computation timestamps
-  - Suggested follow-up questions
+Assignment
+  professor_id    → links to hr-service professor record
+  class_id
+  semester        e.g. "2025-S1"
+  role            LEAD | SUPPORT | EVALUATOR
+  scheduled_hours auto-summed from Schedule Slots for this class
+  delivered_hours updated as semester progresses (from attendance logs)
 ```
+
+**Assignment Rules (enforced on save):**
+- Professor must have a specialization matching the class subject (semantic match, HR-09)
+- Professor's total scheduled hours for semester must not exceed `max_hours` (HR-01 compliance)
+- No two assignments can create a schedule conflict for the same professor
+- Warning (not block) if assigning a contractual professor to a core required module
+
+**Assignment Suggestions**: When creating a new class assignment, the system calls the existing professor matching engine (§6.3 Use case 1) and pre-populates a ranked candidate list.
+
+### 9.4 Dashboard Views (Frontend Demo)
+
+**1. Program Structure View** (Dean)
+- Tree: Program → Semesters → Modules → Classes
+- Each class card shows: assigned teacher (or "Unassigned" in red), enrolled count, delivered/required hours progress bar
+- One-click "Assign teacher" → opens matching suggestions panel
+
+**2. Student List View** (Admin Staff)
+- Filterable table: program, cohort, level, status
+- Bulk actions: import from CSV, export, change status
+- Click student → Student Profile (grades timeline, enrolled classes, attendance rate, at-risk flag)
+
+**3. Class Detail View** (Dean / Admin)
+- Header: class code, program, semester, teacher chip
+- Tabs: Students (roster) | Schedule (weekly calendar) | Grades (grade distribution histogram) | Attendance (heatmap)
+- Inline grade entry for evaluators
+
+**4. Teacher Workload View** (HR Manager)
+- One row per professor: name, contracted hours, scheduled hours, delivered hours, compliance gauge (HR-01)
+- Colour coding: green (within range) · amber (approaching limit) · red (over max or under min)
+- Click row → professor's class list for semester
+
+**5. Schedule Builder** (Admin)
+- Drag-and-drop weekly calendar grid
+- Conflict highlighting: red overlay when a slot conflicts with existing assignment
+- Room utilisation sidebar
+
+### 9.5 Data Model
+
+```sql
+CREATE TABLE students (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id       UUID NOT NULL REFERENCES tenants(id),
+  national_id     VARCHAR(20) UNIQUE NOT NULL,
+  first_name      VARCHAR(100) NOT NULL,
+  last_name       VARCHAR(100) NOT NULL,
+  first_name_ar   VARCHAR(100),
+  last_name_ar    VARCHAR(100),
+  dob             DATE,
+  gender          VARCHAR(10),
+  nationality     VARCHAR(3) DEFAULT 'TN',
+  program_id      UUID REFERENCES programs(id),
+  cohort_year     INTEGER,
+  current_level   VARCHAR(20),
+  status          VARCHAR(20) CHECK (status IN ('enrolled','on_leave','graduated','withdrawn'))
+);
+
+CREATE TABLE programs (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id       UUID NOT NULL REFERENCES tenants(id),
+  code            VARCHAR(30) UNIQUE NOT NULL,
+  name_fr         VARCHAR(300) NOT NULL,
+  name_ar         VARCHAR(300),
+  level           VARCHAR(20) CHECK (level IN ('Licence','Master','Ingenieur','Doctorat')),
+  department      VARCHAR(200),
+  total_credits   INTEGER
+);
+
+CREATE TABLE classes (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id       UUID NOT NULL REFERENCES tenants(id),
+  code            VARCHAR(30) NOT NULL,
+  name_fr         VARCHAR(300) NOT NULL,
+  program_id      UUID REFERENCES programs(id),
+  academic_year   VARCHAR(10),
+  semester        VARCHAR(10),
+  required_hours  INTEGER,
+  delivered_hours INTEGER DEFAULT 0,
+  syllabus_doc_id UUID               -- FK to documents.files
+);
+
+CREATE TABLE class_enrollments (
+  class_id    UUID REFERENCES classes(id),
+  student_id  UUID REFERENCES students(id),
+  enrolled_at TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (class_id, student_id)
+);
+
+CREATE TABLE teacher_assignments (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  class_id        UUID NOT NULL REFERENCES classes(id),
+  professor_id    UUID NOT NULL,     -- FK to hr-service professors
+  semester        VARCHAR(10) NOT NULL,
+  role            VARCHAR(20) CHECK (role IN ('LEAD','SUPPORT','EVALUATOR')),
+  scheduled_hours INTEGER,
+  delivered_hours INTEGER DEFAULT 0,
+  UNIQUE (class_id, professor_id, semester)
+);
+
+CREATE TABLE schedule_slots (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  class_id        UUID NOT NULL REFERENCES classes(id),
+  day_of_week     INTEGER CHECK (day_of_week BETWEEN 0 AND 6),
+  start_time      TIME NOT NULL,
+  end_time        TIME NOT NULL,
+  room            VARCHAR(100),
+  recurrence      VARCHAR(20) DEFAULT 'WEEKLY'
+);
+
+CREATE TABLE student_grades (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id      UUID NOT NULL REFERENCES students(id),
+  class_id        UUID NOT NULL REFERENCES classes(id),
+  assessment_type VARCHAR(30),   -- EXAM, CC, TP, PROJECT
+  score           NUMERIC(5,2),
+  max_score       NUMERIC(5,2) DEFAULT 20,
+  graded_at       TIMESTAMPTZ
+);
+```
+
+### 9.6 KPI Feed
+
+| KPI | Source |
+|-----|--------|
+| `ACA-01` Student-Faculty Ratio | `COUNT(students WHERE status=enrolled)` ÷ FTE professors |
+| `ACA-02` Success Rate | Students with mean grade ≥ 10 ÷ cohort |
+| `ACA-03` Dropout Rate | Students with status=withdrawn ÷ cohort |
+| `ACA-05` Curriculum Coverage | `SUM(delivered_hours)` ÷ `SUM(required_hours)` per class |
+| `HR-01` Workload Compliance | `teacher_assignments.delivered_hours` vs `professors.min/max_hours` |
+| `HR-09` Expertise Match | Matched assignments ÷ total assignments |
 
 ---
 
@@ -1234,323 +1118,38 @@ CREATE TABLE documents.templates (
 
 ---
 
-## 11. API Contract Reference
+## 11. API Contract — Demo Scope
 
-All APIs follow REST conventions. Base URL: `https://api.ucar-erp.tn/v1/`
-
-Authentication: `Authorization: Bearer {jwt_token}` on all requests.
-
-Tenant scoping: Injected from JWT claims. Cross-tenant requests require `X-Global-Scope: true` header and `GLOBAL_READ` permission.
-
-### Key Endpoint Groups
+REST. Base: `https://api.ucar-erp.tn/v1/`. Auth: `Authorization: Bearer {jwt}`. Tenant injected from JWT; cross-tenant requires `GLOBAL_READ`.
 
 ```
-/auth/
-  POST /auth/login                    → JWT token
-  POST /auth/refresh                  → New JWT token
-  GET  /auth/me                       → Current user profile + permissions
-
-/kpi/
-  GET  /kpi/definitions               → Full KPI catalog
-  GET  /kpi/records?period=&domain=   → KPI values for current tenant
-  GET  /kpi/records/{kpi_id}/trend    → Time-series for one KPI
-  GET  /kpi/scores/institution        → UCAR Score for current tenant
-  GET  /kpi/scores/network            → All institution scores (GLOBAL_READ)
-  GET  /kpi/simulate                  → Ranking simulation (what-if)
-  POST /kpi/recompute                 → Trigger manual KPI recomputation (admin)
-
-/documents/
-  POST /documents/upload              → Upload file (multipart)
-  GET  /documents/                    → List documents for tenant
-  GET  /documents/{id}                → Document metadata
-  GET  /documents/{id}/download       → Pre-signed Garage URL
-  GET  /documents/review/queue        → Pending human review items
-  POST /documents/review/{id}/approve → Approve extraction result
-  POST /documents/review/{id}/reject  → Reject + annotate
-  GET  /documents/templates/          → List templates
-  POST /documents/templates/          → Create template
-  POST /documents/migrate/batch       → Start batch migration job
-
-/hr/
-  GET  /hr/professors/                → List professors (tenant-scoped)
-  POST /hr/professors/                → Create professor record
-  GET  /hr/professors/{id}            → Professor profile
-  PUT  /hr/professors/{id}            → Update professor record
-  GET  /hr/professors/{id}/hours      → Workload data
-  GET  /hr/professors/match           → Matching suggestions for a course
-  GET  /hr/professors/eligible-promotions → Promotion eligibility list
-
-/hiring/
-  GET  /hiring/positions/             → Open positions
-  POST /hiring/positions/             → Create position (HR Manager)
-  POST /hiring/applications/          → Submit application (public, no auth)
-  GET  /hiring/applications/          → List applications (HR Manager)
-  POST /hiring/applications/{id}/advance → Move to next phase
-  POST /hiring/permanent/match        → Run Gale-Shapley assignment
-
-/projects/
-  GET  /projects/                     → Project board
-  POST /projects/                     → Post new project
-  GET  /projects/{id}/matches         → Institution match results
-  POST /projects/{id}/assign          → Assign project to institution
-
-/alerts/
-  GET  /alerts/                       → Alert feed (tenant-scoped or global)
-  GET  /alerts/{id}                   → Alert detail
-  POST /alerts/{id}/resolve           → Mark resolved
-  GET  /alerts/thresholds/            → Current threshold config
-  PUT  /alerts/thresholds/{kpi_id}    → Update threshold
-
-/reports/
-  POST /reports/generate              → On-demand report generation
-  GET  /reports/                      → Report history
-  GET  /reports/{id}/download         → Pre-signed URL for PDF/Excel
-
-/nlp/
-  POST /nlp/query                     → Natural language query
-  POST /nlp/query/document            → Query over a specific document
+/auth/    POST login · POST refresh · GET me
+/kpi/     GET records?period=&domain= · GET scores/institution · GET scores/network · POST recompute
+/documents/ POST upload · GET review/queue · POST review/{id}/approve · POST review/{id}/reject · GET templates/
+/hr/      GET professors/ · POST professors/ · GET professors/{id} · PUT professors/{id} · GET professors/{id}/hours · GET professors/match
+/students/ GET · POST · GET {id} · PUT {id} · GET {id}/enrollments · GET {id}/grades
+/classes/  GET · POST · GET {id} · PUT {id} · POST {id}/assign-teacher · GET {id}/students · GET {id}/schedule
+/alerts/  GET · POST {id}/resolve · GET thresholds/ · PUT thresholds/{kpi_id}
+/accreditation/ GET frameworks/ · GET frameworks/{code}/status · GET frameworks/{code}/evidence · GET frameworks/{code}/gaps · POST controls/{id}/attest · POST controls/{id}/not-applicable
 ```
 
-### Standard Error Format
-
-```json
-{
-  "error": {
-    "code": "KPI_INSUFFICIENT_DATA",
-    "message_fr": "Données insuffisantes pour calculer ce KPI.",
-    "message_ar": "بيانات غير كافية لحساب مؤشر الأداء هذا.",
-    "detail": "RES-01 requires at least 1 approved publication_list document for period 2025-S1",
-    "tenant_id": "uuid",
-    "kpi_id": "RES-01"
-  }
-}
-```
+Error format: `{ "error": { "code": "...", "message_fr": "...", "detail": "...", "tenant_id": "uuid" } }`
 
 ---
 
-## 12. Multi-Tenancy & Security
+## 12. Security Principles
 
-### 12.1 Permission Matrix
-
-| Permission            | Student | Faculty | Admin Staff | Dean | President | IT Admin | MESRS Auditor |
-| --------------------- | ------- | ------- | ----------- | ---- | --------- | -------- | ------------- |
-| View own KPIs         | ✓       | ✓       | ✓           | ✓    | ✓         | ✓        | —             |
-| View institution KPIs | —       | limited | ✓           | ✓    | ✓         | ✓        | read-only     |
-| View all institutions | —       | —       | —           | —    | ✓         | ✓        | aggregated    |
-| Upload documents      | —       | ✓       | ✓           | ✓    | —         | ✓        | —             |
-| Approve extractions   | —       | —       | ✓           | ✓    | —         | ✓        | —             |
-| Configure thresholds  | —       | —       | —           | ✓    | ✓         | ✓        | —             |
-| Manage users          | —       | —       | —           | —    | —         | ✓        | —             |
-| Trigger KPI recompute | —       | —       | —           | —    | —         | ✓        | —             |
-| Export MESRS report   | —       | —       | —           | ✓    | ✓         | ✓        | ✓             |
-| Post projects         | —       | —       | —           | ✓    | ✓         | ✓        | —             |
-| Manage hiring         | —       | —       | HR Mgr      | ✓    | ✓         | ✓        | —             |
-
-### 12.2 Row-Level Security
-
-PostgreSQL RLS policies enforce tenant isolation at the database level. Even if application code is compromised, a query from tenant A cannot return tenant B's rows:
-
-```sql
-ALTER TABLE kpi_records ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY tenant_isolation ON kpi_records
-  USING (tenant_id = current_setting('app.current_tenant')::uuid);
-```
-
-The application layer sets `app.current_tenant` from the JWT claims at the start of every database session.
-
-### 12.3 Audit Log
-
-Every write operation is logged to an immutable audit table:
-
-```sql
-CREATE TABLE ucar_global.audit_log (
-  id          UUID PRIMARY KEY,
-  user_id     UUID,
-  tenant_id   UUID,
-  action      VARCHAR(50),   -- CREATE, UPDATE, DELETE, EXPORT, LOGIN
-  entity_type VARCHAR(50),
-  entity_id   UUID,
-  old_value   JSONB,
-  new_value   JSONB,
-  ip_address  INET,
-  user_agent  TEXT,
-  created_at  TIMESTAMPTZ DEFAULT NOW()
-) PARTITION BY RANGE (created_at);
-```
-
-Retention: 5 years (partitioned monthly, archived to cold storage after 1 year).
+- PostgreSQL RLS on every tenant-scoped table: `tenant_id = current_setting('app.current_tenant')::uuid`
+- JWT claims set `app.current_tenant` at session start
+- Audit log on all writes: `action`, `user_id`, `tenant_id`, `entity_type`, `entity_id`, `old_value`, `new_value`, `ip_address`, `created_at`
+- Garage pre-signed URLs scoped per tenant, expire in 15 minutes
 
 ---
 
-## 13. Deployment Topology
+## 13. Deployment
 
-### 13.1 Environments
-
-| Environment  | Purpose                            | Scale                          |
-| ------------ | ---------------------------------- | ------------------------------ |
-| `local`      | Developer machine (Docker Compose) | Single node, mocked ML models  |
-| `staging`    | Pre-production testing (K8s)       | 3-node cluster, 2 mock tenants |
-| `production` | Live system                        | Auto-scaling, 35+ tenants      |
-
-### 13.2 Docker Compose (Local Development)
-
-```yaml
-# docker-compose.yml (abbreviated)
-services:
-  api-gateway: # nginx reverse proxy
-  kpi-service: # FastAPI
-  doc-service: # FastAPI
-  hr-service: # FastAPI
-  alert-service: # FastAPI
-  nlp-service: # FastAPI
-  report-service: # FastAPI
-  auth-service: # Keycloak
-  worker: # Celery worker
-  beat: # Celery beat scheduler
-  postgres: # PostgreSQL + TimescaleDB
-  redis: # Redis
-  garage: # Garage object store (S3-compatible)
-  elasticsearch: # Elasticsearch
-  frontend: # React dev server
-  grafana: # Observability
-  prometheus: # Metrics
-```
-
-### 13.3 Kubernetes Production (Abbreviated)
-
-- Each service: Deployment + HorizontalPodAutoscaler (min 2, max 10 replicas)
-- PostgreSQL: Managed instance (e.g., AWS RDS / Azure Database) or Crunchy Data PGO on K8s
-- Garage: StatefulSet (3+ nodes for replication) or managed object storage
-- Elasticsearch: ECK operator
-- Secrets: Kubernetes Secrets + external secrets manager (Vault or AWS Secrets Manager)
-- Ingress: nginx ingress controller with TLS termination
-- Networking: NetworkPolicy enforcing service-to-service isolation
+Docker Compose (local): `api-gateway` · `kpi-service` · `doc-service` · `hr-service` · `student-service` · `alert-service` · `accreditation-service` · `auth-service` · `worker` · `beat` · `postgres` · `redis` · `garage` · `elasticsearch` · `frontend`
 
 ---
 
-## 14. Implementation Roadmap
-
-### Phase 1 — Foundation (Weeks 1–4)
-
-_Goal: auth, tenant management, first KPI ingestion, document upload_
-
-- [ ] Auth service: JWT, RBAC, Keycloak integration
-- [ ] Tenant provisioning: admin UI to create institutions
-- [ ] Document upload: Garage integration, format normalizer, basic classifier
-- [ ] KPI definitions loaded: all KPI catalog entries seeded
-- [ ] Manual KPI entry: admin can input KPI values directly (bootstrap before full pipeline)
-- [ ] Basic dashboard: KPI cards, no time-series yet
-- [ ] PostgreSQL multi-schema setup with RLS
-
-### Phase 2 — Document Intelligence (Weeks 5–8)
-
-_Goal: working extraction pipeline for 5 core document classes_
-
-- [ ] OCR pipeline: Tesseract + LLM post-correction
-- [ ] Extractors for: grade_sheet, budget_report, faculty_record, syllabus, publication_list
-- [ ] Human review queue UI
-- [ ] Template engine + batch migration CLI
-- [ ] Extraction results → KPI auto-computation for covered KPIs
-- [ ] Document anomaly detection (basic)
-- [ ] Elasticsearch full-text index of extracted documents
-
-### Phase 3 — KPI Engine & Dashboard (Weeks 9–12)
-
-_Goal: full KPI computation, ranking, dashboard complete_
-
-- [ ] Full KPI computation engine (all 8 domains)
-- [ ] TimescaleDB integration for time-series
-- [ ] Institution ranking + composite score
-- [ ] Comparative views (institution vs. network)
-- [ ] Accreditation compliance engine + dashboard (framework controls, test evaluation, evidence portfolio)
-- [ ] President + Dean + KPI detail views complete
-- [ ] PDF/Excel export for all views
-
-### Phase 4 — HR & Alerts (Weeks 13–16)
-
-_Goal: professor management and alert system live_
-
-- [ ] Professor profile CRUD + bulk import
-- [ ] Workload tracking + gauge dashboards
-- [ ] Matching engine (module-to-professor)
-- [ ] Alert engine: threshold monitoring + notification dispatch
-- [ ] Mini audit report generation
-- [ ] Predictive alerts (ML models: dropout, budget overrun)
-
-### Phase 5 — Hiring, Projects & NLP (Weeks 17–20)
-
-_Goal: hiring workflows, project matching, natural language queries_
-
-- [ ] Permanent hiring workflow (Gale-Shapley matching)
-- [ ] Contractual hiring workflow
-- [ ] Project posting + KPI-based matching
-- [ ] NLP query interface (RAG over document index)
-- [ ] Automated scheduled reports
-- [ ] Mobile app (React Native) — MVP scope
-
-### Phase 6 — Hardening & Go-Live (Weeks 21–24)
-
-_Goal: production-ready at scale_
-
-- [ ] Load testing (35 tenants, 5 years of historical data)
-- [ ] Security audit + penetration testing
-- [ ] Arabic RTL QA across all views
-- [ ] Accessibility audit (WCAG 2.1 AA)
-- [ ] Staff training materials + video tutorials
-- [ ] Runbook documentation
-- [ ] MESRS integration API (report export)
-- [ ] Production deployment
-
----
-
-## 15. Open Questions & Constraints
-
-### Unresolved Technical Questions
-
-| #   | Question                                                                          | Impact                             | Owner                |
-| --- | --------------------------------------------------------------------------------- | ---------------------------------- | -------------------- |
-| Q1  | Will UCAR provide API access to the national inscription portal (inscription.tn)? | ACA-02, ACA-03, INT-02 data source | UCAR IT              |
-| Q2  | Scopus / Web of Science API access — institutional subscription?                  | RES-01, RES-02, RES-09             | UCAR Research Office |
-| Q3  | Does Keycloak need to federate with Ministry LDAP/Active Directory?               | SSO for permanent staff            | Ministry IT          |
-| Q4  | Is IoT sensor infrastructure available on any UCAR campus?                        | ESG-01, ESG-02, ESG-03             | Facilities           |
-| Q5  | Budget for cloud infrastructure vs. on-premise?                                   | Deployment topology                | UCAR Admin           |
-| Q6  | Are employer surveys to be conducted by UCAR or sourced from QS directly?         | EMP-01, EMP-02                     | External Relations   |
-| Q7  | Legal basis for storing professor personal data (Tunisian Law 63-2004)?           | HR module compliance               | Legal counsel        |
-| Q8  | Which embedding model and vector store for professor specialization matching? (options: pgvector extension on existing PostgreSQL, or separate service) | HR-09, professor matching engine | Engineering |
-| Q9  | How is attendance tracked for ACA-11 and HR-06 (monthly)? Is there an existing attendance system or is it document-upload only? | ACA-11, HR-06 computation feasibility | UCAR IT |
-| Q10 | Is there a consultancy/knowledge transfer revenue line in budget reports, or does RES-10 require a separate document template? | RES-10 data source | Finance |
-| Q11 | MESRS: which specific ministerial circulars define mandatory annual document submissions? | MESRS framework completeness | UCAR Legal / Admin |
-| Q12 | Should NCR (Non-Conformance Records) for GOV-02 be entered directly in the platform or extracted from uploaded audit_report documents? | GOV-02 data pipeline | Quality / ISO team |
-| Q13 | Offline mode: does the 24h cache need to support mobile (React Native) or only web? What is the sync protocol on reconnect? | Offline mode implementation scope | Engineering |
-
-### Known Constraints
-
-- **Network reliability**: Some UCAR campuses (Bizerte, Nabeul) have inconsistent connectivity. Read-only offline mode with 24h KPI cache is mandatory. Cache covers computed KPI values and last-evaluated control statuses only — document upload and attestation submission require connectivity.
-- **Arabic OCR quality**: Tesseract Arabic accuracy degrades on handwritten text. GPT-4o vision fallback adds latency and cost. Budget allocation needed.
-- **QS Academic Reputation and Employer Reputation**: These controls (30% + 15% of QS) require the institution to upload the official QS survey result document they receive. The platform cannot generate these values — it can only record them. They remain NEEDS_EVIDENCE until uploaded.
-- **Data maturity lag**: Year 1 KPIs will be partially computed (missing data from non-digitalized documents). System must handle partial computation gracefully with `is_estimated = true`, not zero values.
-- **Gale-Shapley output is advisory**: Ministry retains final authority on permanent professor assignments. Platform generates recommendation; human override with mandatory audit log.
-- **QS weights version-locked**: Weights in `accreditation.md` reflect QS 2024 methodology. QS updates its methodology periodically — the `frameworks.version` field must be updated and weights re-seeded when QS publishes a new methodology.
-
-### Spec Documents To Be Written
-
-Each of the following will be a separate `specs/{service}.md` file with: data model detail, endpoint specs, LLM prompt templates, test cases, and edge case handling:
-
-- [ ] `specs/kpi-service.md`
-- [ ] `specs/doc-service.md`
-- [ ] `specs/hr-service.md`
-- [ ] `specs/project-service.md`
-- [ ] `specs/alert-service.md`
-- [ ] `specs/accreditation-service.md`
-- [ ] `specs/nlp-service.md`
-- [ ] `specs/report-service.md`
-- [ ] `specs/auth-service.md`
-- [ ] `specs/admin-service.md`
-- [ ] `specs/frontend.md`
-- [ ] `specs/migration-playbook.md`
-
----
-
-_End of UCAR ERP Master Document v1.0_  
-_Next: `specs/kpi-service.md` — detailed KPI computation engine specification_
+_End of UCAR ERP Master Document — Demo Scope_
