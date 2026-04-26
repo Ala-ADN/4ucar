@@ -44,6 +44,43 @@ async def _get_import_or_404(import_id: uuid.UUID, db: AsyncSession) -> ImportRe
     return record
 
 
+def _period_to_date_range(period: str | None):
+    """Best-effort parse of "YYYY", "YYYY-S{1,2}" or "YYYY-Q{1..4}" into
+    (start, end) dates. Returns Jan 1 → Dec 31 of the year if the period
+    can't be parsed — KPIs can still be recomputed on a year-window."""
+    from datetime import date
+
+    if not period:
+        today = date.today()
+        return date(today.year, 1, 1), date(today.year, 12, 31)
+    try:
+        if "-S" in period:
+            year_str, s_str = period.split("-S")
+            year = int(year_str)
+            sem = int(s_str)
+            if sem == 1:
+                return date(year, 1, 1), date(year, 6, 30)
+            return date(year, 7, 1), date(year, 12, 31)
+        if "-Q" in period:
+            year_str, q_str = period.split("-Q")
+            year = int(year_str)
+            q = int(q_str)
+            start_month = (q - 1) * 3 + 1
+            end_month = start_month + 2
+            from calendar import monthrange
+
+            return date(year, start_month, 1), date(
+                year, end_month, monthrange(year, end_month)[1]
+            )
+        year = int(period)
+        return date(year, 1, 1), date(year, 12, 31)
+    except (ValueError, IndexError):
+        from datetime import date as _date
+
+        today = _date.today()
+        return _date(today.year, 1, 1), _date(today.year, 12, 31)
+
+
 # ── Status ────────────────────────────────────────────────────────────────────
 
 
@@ -291,6 +328,26 @@ async def commit_import(
         "committed_at": record.committed_at.isoformat(),
     })
     await publish(redis, settings.events_channel, event)
+
+    # ── Enqueue KPI recompute ─────────────────────────────────────────────────
+    # Best-effort. The task itself swallows transient errors; KPI staleness
+    # is not a data-loss event.
+    try:
+        from backend.services.ingestion_service.tasks import (
+            recompute_kpis_after_commit,
+        )
+
+        period_start, period_end = _period_to_date_range(record.period)
+        recompute_kpis_after_commit.apply_async(
+            args=[
+                str(record.institution_id),
+                period_start.isoformat(),
+                period_end.isoformat(),
+            ],
+            queue="extraction",
+        )
+    except Exception:  # pragma: no cover — purely opportunistic
+        pass
 
     return {
         "status": "committed",

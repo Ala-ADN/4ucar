@@ -22,13 +22,10 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Import all model modules so their metadata is registered on Base
-from backend.shared.db.base import Base  # noqa: E402
-from backend.services.ingestion_service.models.import_record import (  # noqa: F401, E402
-    ImportRecord, DataRecord, QuarantineRow, DataRequest,
-    DataRequestResponse, LockedPeriod,
-)
-from backend.services.ingestion_service.models.audit import AuditEntry  # noqa: F401, E402
+# Import all model modules so their metadata is registered on Base.
+# `backend.services.ingestion_service.models` re-exports every table from
+# its package __init__, so importing the package is enough.
+import backend.services.ingestion_service.models  # noqa: F401, E402
 
 target_metadata = Base.metadata
 

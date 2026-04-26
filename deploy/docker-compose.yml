@@ -224,3 +224,4 @@ volumes:
   pgdata:
   garage_meta:
   garage_data:
+  uploads:

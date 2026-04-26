@@ -10,6 +10,7 @@ from backend.services.ingestion_service.routers import (
     imports,
     quarantine,
     requests,
+    templates,
     upload,
 )
 from backend.shared.exceptions import UcarError, ucar_error_handler
@@ -75,6 +76,7 @@ def create_app() -> FastAPI:
     app.include_router(quarantine.router, tags=["quarantine"])
     app.include_router(audit.router, tags=["audit"])
     app.include_router(requests.router, tags=["data-requests"])
+    app.include_router(templates.router, tags=["templates"])
 
     return app
 

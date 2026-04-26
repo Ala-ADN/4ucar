@@ -1,7 +1,7 @@
 """Create ingestion service tables.
 
 Revision ID: 001_ingestion_tables
-Revises:
+Revises: 20260426_0000
 Create Date: 2026-04-25
 """
 
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 revision = "001_ingestion_tables"
-down_revision = None
+down_revision = "20260426_0000"
 branch_labels = None
 depends_on = None
 

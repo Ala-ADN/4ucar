@@ -14,6 +14,7 @@ shape, embeddings can drop in later.
 from __future__ import annotations
 
 import re
+import unicodedata
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query
@@ -53,10 +54,19 @@ _STOPWORDS = {
 
 
 def _tokens(text: str) -> set[str]:
-    """Lowercase, strip punctuation, drop stopwords, keep tokens of len>=2."""
+    """Lowercase, fold accents, strip punctuation, drop stopwords, keep tokens of len>=2.
+
+    Accent folding (NFD + drop combining marks) is what lets a query like
+    "telecommunications" hit a specialty stored as "Télécommunications" — most
+    of the dataset is French, so without this most matches return empty.
+    """
     if not text:
         return set()
-    cleaned = re.sub(r"[^\w\s]", " ", text.lower(), flags=re.UNICODE)
+    folded = "".join(
+        ch for ch in unicodedata.normalize("NFD", text.lower())
+        if not unicodedata.combining(ch)
+    )
+    cleaned = re.sub(r"[^\w\s]", " ", folded, flags=re.UNICODE)
     return {t for t in cleaned.split() if len(t) >= 2 and t not in _STOPWORDS}
 
 

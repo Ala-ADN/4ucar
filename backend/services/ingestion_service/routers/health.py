@@ -21,9 +21,11 @@ async def health():
     results: dict[str, str] = {}
 
     # ── Database ─────────────────────────────────────────────────────────────
+    # Use the same `database_url` as the rest of the service so a single
+    # env var (DATABASE_URL) controls connectivity end-to-end.
     try:
         from sqlalchemy.ext.asyncio import create_async_engine
-        engine = create_async_engine(settings.postgres_dsn, pool_size=1)
+        engine = create_async_engine(settings.database_url, pool_size=1)
         async with engine.connect() as conn:
             await conn.execute(__import__("sqlalchemy").text("SELECT 1"))
         await engine.dispose()

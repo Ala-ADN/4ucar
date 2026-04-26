@@ -8,6 +8,7 @@ import {
   ChevronRight,
   AlertCircle,
   GraduationCap,
+  UploadCloud,
 } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useAppStore } from '@/src/store';
@@ -18,6 +19,7 @@ const navItems = [
   { icon: LayoutDashboard, label: 'Tableau de Bord', path: '/' },
   { icon: School, label: 'Carte du Réseau', path: '/institutions' },
   { icon: GraduationCap, label: 'Corps Enseignant', path: '/professors' },
+  { icon: UploadCloud, label: 'Téléversement', path: '/ingestion' },
   { icon: ShieldCheck, label: 'Accréditations', path: '/accreditations' },
   { icon: Wallet, label: 'Finances', path: '/finance' },
   { icon: AlertCircle, label: 'Centre d\'Opérations', path: '/alertes' },

@@ -14,6 +14,7 @@ import { Analytics } from './pages/Analytics';
 import { Finance } from './pages/Finance';
 import { Accreditations } from './pages/Accreditations';
 import { Professors } from './pages/Professors';
+import { Ingestion } from './pages/Ingestion';
 
 export default function App() {
   return (
@@ -29,6 +30,7 @@ export default function App() {
           <Route path="/finance" element={<Finance />} />
           <Route path="/accreditations" element={<Accreditations />} />
           <Route path="/professors" element={<Professors />} />
+          <Route path="/ingestion" element={<Ingestion />} />
         </Route>
       </Routes>
     </BrowserRouter>

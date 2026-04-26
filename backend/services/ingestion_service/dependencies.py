@@ -27,19 +27,31 @@ class CurrentUser:
 
 
 async def get_db() -> AsyncSession:
-    settings = get_settings()
-    async for session in get_session(settings):
+    async for session in get_session():
         yield session
+
+
+# Hard-coded dev identity. Used only when APP_ENV=local and no
+# Authorization header is provided — gives the portal a working session
+# while Keycloak/JWT issuance is still being wired. Production will reject
+# unauthenticated requests as before.
+_DEV_USER = CurrentUser(
+    user_id=uuid.UUID("00000000-0000-0000-0000-0000000000aa"),
+    institution_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+    role=Role.SUPER_ADMIN,
+)
 
 
 async def get_current_user(
     authorization: Annotated[str | None, Header()] = None,
 ) -> CurrentUser:
+    settings = get_settings()
     if not authorization or not authorization.startswith("Bearer "):
+        if settings.app_env == "local":
+            return _DEV_USER
         raise SessionExpired(detail="Authorization header missing or malformed.")
 
     token = authorization.removeprefix("Bearer ").strip()
-    settings = get_settings()
 
     claims = decode_token(token, settings.app_secret_key)
 

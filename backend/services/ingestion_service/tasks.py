@@ -254,3 +254,52 @@ def _write_audit(session: Session, record: ImportRecord, action: str, descriptio
     )
     session.add(entry)
     session.commit()
+
+
+# ---------------------------------------------------------------------------
+# KPI recompute trigger — fired after a successful commit.
+#
+# The kpi-service exposes POST /kpi/recompute (runs Domains A-G and upserts
+# kpi_records). It expects an `X-Tenant-Id` header — institution_id maps
+# 1-1 to tenant_id in the current single-tenant deployment.
+# ---------------------------------------------------------------------------
+
+
+@celery_app.task(name="ingestion.recompute_kpis_after_commit", bind=True, max_retries=3)
+def recompute_kpis_after_commit(
+    self,
+    institution_id: str,
+    period_start: str,
+    period_end: str,
+) -> dict:
+    """Best-effort POST to kpi-service. Failures are logged but never
+    block the commit pipeline — KPI staleness is not a data-loss event.
+    """
+    import os
+
+    import httpx
+
+    base_url = os.environ.get("KPI_SERVICE_URL", "http://kpi-service:8002")
+    try:
+        resp = httpx.post(
+            f"{base_url}/kpi/recompute",
+            json={"period_start": period_start, "period_end": period_end},
+            headers={"X-Tenant-Id": institution_id},
+            timeout=60.0,
+        )
+        resp.raise_for_status()
+        body = resp.json()
+        logger.info(
+            "kpi recompute ok institution=%s records=%s",
+            institution_id,
+            body.get("records_computed"),
+        )
+        return body
+    except httpx.HTTPError as exc:
+        logger.warning(
+            "kpi recompute failed institution=%s err=%s — retrying",
+            institution_id,
+            exc,
+        )
+        # Retry with exponential backoff.
+        raise self.retry(exc=exc, countdown=10 * (self.request.retries + 1))

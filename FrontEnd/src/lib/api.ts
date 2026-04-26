@@ -347,3 +347,197 @@ export const professorsApi = {
       body: JSON.stringify(payload),
     }),
 };
+
+// ---------------------------------------------------------------------------
+// Ingestion service — uploads, templates, mass-import portal
+// ---------------------------------------------------------------------------
+
+const INGESTION_BASE = '/api/ingestion';
+
+async function ingestionRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${INGESTION_BASE}${path}`, {
+    headers: {
+      ...(init?.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
+      ...(init?.headers ?? {}),
+    },
+    ...init,
+  });
+  if (!res.ok) {
+    let body: unknown = null;
+    try {
+      body = await res.json();
+    } catch {
+      // ignore
+    }
+    throw new ApiError(res.status, res.statusText, body);
+  }
+  if (res.status === 204) return undefined as T;
+  return res.json() as Promise<T>;
+}
+
+export type IngestionImportStatus =
+  | 'pending'
+  | 'extracted'
+  | 'mapping_proposed'
+  | 'mapping_confirmed'
+  | 'validated'
+  | 'committed'
+  | 'cancelled';
+
+export interface UploadResult {
+  import_id: string;
+  status: IngestionImportStatus;
+  message: string;
+}
+
+export interface ImportStatus {
+  import_id: string;
+  status: IngestionImportStatus;
+  domain: string | null;
+  period: string | null;
+  original_filename: string;
+  created_at: string;
+  headers?: string[];
+  preview?: Record<string, unknown>[];
+  total_rows?: number;
+}
+
+export interface TemplateSummary {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  source_format: string;
+  domain: string;
+  sheet_name: string | null;
+  sample_headers: string[];
+  match_count: number;
+  last_matched_at: string | null;
+  created_at: string;
+  field_count: number;
+  mapped_field_count: number;
+}
+
+export interface TemplateField {
+  source_header: string;
+  target_field_id: string | null;
+  target_field_label: string | null;
+  transform_hint: string | null;
+  is_required: boolean;
+}
+
+export interface TemplateDetail extends TemplateSummary {
+  confirmed_mapping: Record<string, string | null>;
+  fields: TemplateField[];
+  sample_preview: Record<string, unknown>[] | null;
+}
+
+export interface MatchSuggestion {
+  template: TemplateSummary;
+  score: number;
+  header_coverage: number;
+  matched_headers: string[];
+  auto_confirm: boolean;
+}
+
+export interface TemplateMatchResponse {
+  suggestions: MatchSuggestion[];
+  best: MatchSuggestion | null;
+}
+
+export interface ApplyTemplateResult {
+  import_id: string;
+  template_id: string;
+  status: IngestionImportStatus;
+  confirmed_mapping: Record<string, string | null>;
+}
+
+export interface CreateTemplateRequest {
+  import_id: string;
+  code: string;
+  name: string;
+  description?: string;
+}
+
+export interface CommitResult {
+  status: IngestionImportStatus;
+  records_committed: number;
+  records_quarantined: number;
+}
+
+export const ingestionApi = {
+  upload: (params: {
+    file: File;
+    institutionId: string;
+    domain: string;
+    period: string;
+    isHistorical?: boolean;
+  }) => {
+    const fd = new FormData();
+    fd.append('file', params.file);
+    fd.append('institution_id', params.institutionId);
+    fd.append('domain', params.domain);
+    fd.append('period', params.period);
+    fd.append('is_historical', String(params.isHistorical ?? false));
+    return ingestionRequest<UploadResult>('/upload', {
+      method: 'POST',
+      body: fd,
+    });
+  },
+
+  importStatus: (importId: string) =>
+    ingestionRequest<ImportStatus>(`/imports/${encodeURIComponent(importId)}/status`),
+
+  matchTemplates: (payload: {
+    institution_id: string;
+    headers: string[];
+    source_format: string;
+    domain?: string | null;
+  }) =>
+    ingestionRequest<TemplateMatchResponse>('/templates/match', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  applyTemplate: (importId: string, templateId: string) =>
+    ingestionRequest<ApplyTemplateResult>(
+      `/imports/${encodeURIComponent(importId)}/apply-template/${encodeURIComponent(templateId)}`,
+      { method: 'POST' },
+    ),
+
+  listTemplates: (params: {
+    institution_id: string;
+    domain?: string;
+    source_format?: string;
+    include_inactive?: boolean;
+  }) => ingestionRequest<TemplateSummary[]>(`/templates${toQueryString(params)}`),
+
+  getTemplate: (templateId: string) =>
+    ingestionRequest<TemplateDetail>(`/templates/${encodeURIComponent(templateId)}`),
+
+  createTemplate: (body: CreateTemplateRequest) =>
+    ingestionRequest<TemplateDetail>('/templates', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  deleteTemplate: (templateId: string) =>
+    ingestionRequest<void>(`/templates/${encodeURIComponent(templateId)}`, {
+      method: 'DELETE',
+    }),
+
+  commit: (importId: string, overwriteMode: 'overwrite' | 'merge' | 'cancel' = 'merge') =>
+    ingestionRequest<CommitResult>(
+      `/imports/${encodeURIComponent(importId)}/commit`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ overwrite_mode: overwriteMode }),
+      },
+    ),
+
+  cancel: (importId: string) =>
+    ingestionRequest<{ status: string }>(
+      `/imports/${encodeURIComponent(importId)}/cancel`,
+      { method: 'POST' },
+    ),
+};

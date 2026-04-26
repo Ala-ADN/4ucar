@@ -11,7 +11,8 @@
       "Bash(python -m scripts.seed_insat_dgim_dgpi)",
       "*",
       "Bash(git ls-tree *)",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(xargs wc *)"
     ]
   }
 }
