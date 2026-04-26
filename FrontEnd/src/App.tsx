@@ -8,10 +8,10 @@ import { AppShell } from './components/layout/AppShell';
 import { Overview } from './pages/Overview';
 import { Institutions } from './pages/Institutions';
 import { InstitutionDetail } from './pages/InstitutionDetail';
-import { MapView } from './pages/MapView';
+import { Rankings } from './pages/Rankings';
 import { Alerts } from './pages/Alerts';
 import { Analytics } from './pages/Analytics';
-import { Rankings } from './pages/Rankings';
+import { Finance } from './pages/Finance';
 
 export default function App() {
   return (
@@ -21,13 +21,12 @@ export default function App() {
           <Route path="/" element={<Overview />} />
           <Route path="/institutions" element={<Institutions />} />
           <Route path="/institutions/:code" element={<InstitutionDetail />} />
-          <Route path="/carte" element={<MapView />} />
+          <Route path="/rankings" element={<Rankings />} />
           <Route path="/alertes" element={<Alerts />} />
-          <Route path="/analytiques" element={<Analytics />} />
-          <Route path="/classements" element={<Rankings />} />
+          <Route path="/reports" element={<Analytics />} />
+          <Route path="/finance" element={<Finance />} />
         </Route>
       </Routes>
     </BrowserRouter>
   );
 }
-

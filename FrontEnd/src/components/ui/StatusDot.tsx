@@ -12,9 +12,9 @@ export function StatusDot({ status, animate = false }: { status: HealthStatus, a
   return (
     <div className="relative flex items-center justify-center">
       {animate && status === 'critical' && (
-        <span className="absolute inline-flex h-full w-full rounded-full bg-status-critical opacity-75 animate-ping"></span>
+        <span className="absolute inline-flex h-full w-full rounded-full bg-status-critical opacity-30"></span>
       )}
-      <div className={cn("w-2.5 h-2.5 rounded-full", colors[status])} />
+      <div className={cn("w-2.5 h-2.5 rounded-full border border-white", colors[status])} />
     </div>
   );
 }
@@ -22,15 +22,15 @@ export function StatusDot({ status, animate = false }: { status: HealthStatus, a
 export function Badge({ children, variant = "info" }: { children: React.ReactNode, variant?: HealthStatus | "info" | "purple" | "amber" }) {
   const styles: Record<string, string> = {
     info: "bg-blue-50 text-blue-700",
-    good: "bg-status-good-bg text-status-good",
-    warning: "bg-status-medium-bg text-status-medium",
-    critical: "bg-status-critical-bg text-status-critical",
-    purple: "bg-purple-100 text-purple-700",
+    good: "bg-green-50 text-green-700",
+    warning: "bg-amber-50 text-amber-700",
+    critical: "bg-red-50 text-red-700",
+    purple: "bg-slate-100 text-slate-700",
     amber: "bg-amber-100 text-amber-700"
   };
 
   return (
-    <span className={cn("px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider", styles[variant])}>
+    <span className={cn("px-2 py-0.5 rounded text-xs font-medium", styles[variant])}>
       {children}
     </span>
   );

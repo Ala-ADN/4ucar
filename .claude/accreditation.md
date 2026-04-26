@@ -32,7 +32,7 @@ An external accreditation body or ranking methodology that defines requirements 
 | Field | Type | Notes |
 |---|---|---|
 | `id` | UUID | |
-| `code` | VARCHAR(20) | `QS`, `THE`, `ARWU`, `ISO21001`, `MESRS` |
+| `code` | VARCHAR(20) | `ISO9001`, `ISO21001`, `GREENMETRIC` |
 | `name_fr` / `name_ar` | TEXT | Bilingual display name |
 | `version` | VARCHAR(20) | e.g. `2025` — frameworks update annually |
 | `description` | TEXT | What this framework measures and who uses it |
@@ -43,11 +43,9 @@ An external accreditation body or ranking methodology that defines requirements 
 
 | Code | Name | Scope | Controls | Notes |
 |---|---|---|---|---|
-| `QS` | QS World University Rankings | NETWORK | 9 | Weights per QS 2024 methodology (sum = 100%): AR 30%, ER 15%, FSR 10%, CPF 20%, IFR 5%, ISR 5%, IRN 5%, EO 5%, SUST 5%. AR and ER satisfied by uploading received QS survey result documents. |
-| `THE` | Times Higher Education Rankings | NETWORK | 5 groups | Teaching, Research, Citations, Industry Income, International Outlook — mapped to measurable sub-indicators |
-| `ARWU` | Academic Ranking of World Universities (Shanghai) | NETWORK | 6 | Alumni/staff Nobel & Fields (binary, expected zero — tracked for completeness), Publications, HiCi, PUB, PCP |
-| `ISO21001` | ISO 21001:2018 EOMS | INSTITUTION | 12 key clauses | Educational Organization Management System — one compliance posture per institution |
-| `MESRS` | Ministère de l'Enseignement Supérieur (Tunisia) | INSTITUTION | TBD | National regulatory compliance; controls seeded from publicly available ministerial circulars |
+| `ISO9001` | ISO 9001:2015 Quality Management System | INSTITUTION | 10 clauses | Generic QMS — document control, risk management, internal audit, nonconformity. Foundational layer that ISO 21001 extends. |
+| `ISO21001` | ISO 21001:2018 Educational Organization Management System | INSTITUTION | 12 key clauses | EOMS — extends ISO 9001 for educational orgs: learner-focused requirements, curriculum design, competence management, student performance monitoring. |
+| `GREENMETRIC` | UI GreenMetric World University Rankings | NETWORK | 6 categories | Setting & Infrastructure, Energy & Climate Change, Waste, Water, Transport, Education & Research. Evidence: energy reports, sustainability surveys, transport surveys. |
 
 ---
 
@@ -59,7 +57,7 @@ The atomic requirement within a framework — equivalent to a "control" in Vanta
 |---|---|---|
 | `id` | UUID | |
 | `framework_id` | UUID | |
-| `code` | VARCHAR(30) | e.g. `QS-CPF`, `ISO21001-6.1`, `THE-TEACH-FSR` |
+| `code` | VARCHAR(30) | e.g. `ISO9001-7.5`, `ISO21001-8.2`, `GM-ENERGY` |
 | `name_fr` / `name_ar` | TEXT | |
 | `description` | TEXT | What the framework body officially requires |
 | `category` | VARCHAR(100) | Grouping within the framework (e.g. "Research", "Teaching", "Governance") |
@@ -170,9 +168,9 @@ ALTER TABLE documents.templates
 **How it works end-to-end:**
 
 ```
-Admin defines Template: "Annual Publication List"
-  → linked_test_ids = [test_id for QS-CPF document upload test,
-                        test_id for THE-RESEARCH document upload test]
+Admin defines Template: "Grade Sheet"
+  → linked_test_ids = [test_id for ISO21001-8.2 document upload test,
+                        test_id for ISO9001-8.1 document upload test]
 
 Institution uploads a document → doc-service classifies it → matches "publication_list" template
   → Document enters review queue
@@ -194,22 +192,20 @@ The following mappings are pre-configured at platform launch. Admins can add cus
 
 | Template | Controls Satisfied |
 |---|---|
-| `publication_list` | QS-CPF (citations/faculty), THE-RESEARCH-PUB, QS-IRN (if international co-authors extracted) |
-| `faculty_record` | QS-FSR (faculty/student ratio), THE-TEACH-FSR, QS-IFR (if international field present) |
-| `grade_sheet` | ISO21001-8.2 (student performance monitoring), MESRS-ACAD-RESULTS |
-| `budget_report` | THE-INDUSTRY-INCOME (if industry funding line present), ISO21001-9.1 |
-| `employer_survey` | QS-ER (employer reputation), QS-EO (employment outcomes) |
-| `qs_academic_reputation_results` | QS-AR (academic reputation — received QS survey scorecard) |
-| `qs_employer_reputation_results` | QS-ER (employer reputation — received QS survey scorecard) |
-| `mobility_report` | QS-ISR (international student ratio), QS-IFR |
-| `phd_enrollment_list` | THE-TEACH-DOCTORAL, QS-FSR (doctoral students count) |
-| `energy_report` | QS-SUST (sustainability composite), THE-SUST |
-| `audit_report` | ISO21001-9.3 (management review), ISO21001-8.8 |
-| `hiring_dossier` | ISO21001-7.1 (competence and HR), MESRS-HR |
-| `meeting_minutes` | ISO21001-9.3 (management review), GOV-03 |
-| `convention` | QS-IRN (international partnerships), INT-05 |
-| `disaster_recovery_procedure` | ISO21001-8.3 (operational planning), MESRS-GOVERNANCE |
-| `risk_register` | ISO21001-6.1 (risk-based thinking), GOV-04 |
+| `grade_sheet` | ISO21001-8.2 (student performance monitoring), ISO9001-8.1 (operational control) |
+| `syllabus` | ISO21001-8.3 (design of educational products), ISO9001-8.1 |
+| `faculty_record` | ISO21001-7.1 (competence), ISO9001-7.2 (competence) |
+| `hiring_dossier` | ISO21001-7.1 (competence), ISO9001-7.2 |
+| `budget_report` | ISO21001-9.1 (monitoring & measurement), ISO9001-9.1 |
+| `audit_report` | ISO21001-9.2 (internal audit), ISO9001-9.2 |
+| `meeting_minutes` | ISO21001-9.3 (management review), ISO9001-9.3 |
+| `risk_register` | ISO21001-6.1 (risk-based thinking), ISO9001-6.1 |
+| `governance_charter` | ISO21001-4.4 (EOMS scope), ISO9001-4.3 (QMS scope) |
+| `disaster_recovery_procedure` | ISO21001-8.5 (operational planning), ISO9001-8.1 |
+| `energy_report` | GREENMETRIC-ENERGY (energy & climate change category) |
+| `sustainability_survey` | GREENMETRIC-TRANSPORT (transport), GREENMETRIC-EDU (education & research) |
+| `waste_report` | GREENMETRIC-WASTE (waste management category) |
+| `water_report` | GREENMETRIC-WATER (water management category) |
 
 ---
 
@@ -220,19 +216,19 @@ The following mappings are pre-configured at platform launch. Admins can add cus
 Top-level view when a user opens the Accreditation section. Shows all active frameworks side by side.
 
 ```
-┌──────────────────────────────────────────────────────────────────────────┐
-│  Accreditation & Framework Compliance                                    │
-│                                                                          │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐  │
-│  │    QS    │  │   THE    │  │   ARWU   │  │ISO 21001 │  │  MESRS   │  │
-│  │          │  │          │  │          │  │          │  │          │  │
-│  │ ████░░   │  │ ██░░░░   │  │ ███░░░   │  │ ████████ │  │ ████░░   │  │
-│  │   5/7    │  │  3/5     │  │   3/6    │  │  10/12   │  │   8/12   │  │
-│  │ PASSING  │  │ FAILING  │  │ FAILING  │  │ PASSING  │  │ FAILING  │  │
-│  └──────────┘  └──────────┘  └──────────┘  └──────────┘  └──────────┘  │
-│                                                                          │
-│  [Select framework to view details]                                      │
-└──────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│  Accreditation & Framework Compliance                        │
+│                                                              │
+│  ┌──────────────┐  ┌──────────────┐  ┌───────────────────┐  │
+│  │  ISO 9001    │  │  ISO 21001   │  │  UI GreenMetric   │  │
+│  │              │  │              │  │                   │  │
+│  │  ████████    │  │  ██████░░    │  │  ████░░░░         │  │
+│  │    8/10      │  │    8/12      │  │     4/6           │  │
+│  │  PASSING     │  │  FAILING     │  │  FAILING          │  │
+│  └──────────────┘  └──────────────┘  └───────────────────┘  │
+│                                                              │
+│  [Select framework to view details]                          │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ### 5.2 Framework Detail View
@@ -245,18 +241,17 @@ One row per control, sorted by: FAILING first, then NEEDS_EVIDENCE, then PASSING
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│  QS World University Rankings 2025          ██████░░░ 5/9 passing│
-├──────────┬────────────────────────┬────────┬──────────┬──────────┤
-│  Code    │  Control               │ Weight │  Status  │ Evidence │
-├──────────┼────────────────────────┼────────┼──────────┼──────────┤
-│ QS-AR    │ Academic Reputation    │  30%   │ NEEDS_EV │ 0/1 docs │
-│ QS-ER    │ Employer Reputation    │  15%   │ FAILING  │ 0/1 docs │
-│ QS-CPF   │ Citations per Faculty  │  20%   │ FAILING  │ ✓ KPI    │
-│           │                        │        │          │ 0/1 docs │
-│ QS-FSR   │ Faculty/Student Ratio  │  10%   │ PASSING  │ ✓ KPI    │
-│           │                        │        │          │ ✓ docs   │
-│ ...      │ ...                    │  ...   │  ...     │  ...     │
-└──────────┴────────────────────────┴────────┴──────────┴──────────┘
+│  ISO 21001:2018 — INSAT                      ████████░░ 8/12     │
+├──────────────┬──────────────────────────┬────┬──────────┬────────┤
+│  Code        │  Control                 │ W  │  Status  │ Evid.  │
+├──────────────┼──────────────────────────┼────┼──────────┼────────┤
+│ ISO21001-6.1 │ Risk register current    │ —  │ FAILING  │ 0 docs │
+│ ISO21001-8.2 │ Student performance mon. │ —  │ PASSING  │ ✓ docs │
+│ ISO21001-8.3 │ Syllabi on file          │ —  │ PASSING  │ ✓ docs │
+│ ISO21001-9.2 │ Internal audit on sched. │ —  │ NEEDS_EV │ 0 docs │
+│ ISO21001-9.3 │ Management review mins   │ —  │ PASSING  │ ✓ docs │
+│ ...          │ ...                      │ …  │  ...     │  ...   │
+└──────────────┴──────────────────────────┴────┴──────────┴────────┘
 ```
 
 Clicking a row expands it inline to show:
@@ -272,43 +267,35 @@ All documents linked to at least one control in the currently selected framework
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  Evidence Portfolio — QS 2025                                   │
+│  Evidence Portfolio — ISO 21001:2018 · INSAT                    │
 │                                                                 │
-│  Showing 12 documents linked to QS controls                     │
+│  Showing 9 documents linked to ISO 21001 controls               │
 │                                                                 │
 │  [Search]  [Filter by: template | control | status]             │
 │                                                                 │
 │  ┌─────────────────────────────────────────────────────────┐   │
-│  │ 📄 publication_list_2024.xlsx          Approved          │   │
-│  │    Template: Annual Publication List                     │   │
-│  │    Uploaded: 2026-03-12  by: Admin INSAT                │   │
-│  │    Satisfies: QS-CPF · THE-RESEARCH-PUB · QS-IRN        │   │
+│  │ 📄 grade_sheet_S1_2025.xlsx            Approved          │   │
+│  │    Template: Grade Sheet                                 │   │
+│  │    Uploaded: 2026-02-14  by: Admin INSAT                │   │
+│  │    Satisfies: ISO21001-8.2 · ISO9001-8.1                │   │
 │  │    [View document]  [View extraction]                    │   │
 │  └─────────────────────────────────────────────────────────┘   │
 │                                                                 │
 │  ┌─────────────────────────────────────────────────────────┐   │
-│  │ 📄 faculty_list_S1_2025.xlsx           Approved          │   │
-│  │    Template: Faculty Record                              │   │
-│  │    Uploaded: 2026-01-08  by: HR Manager                 │   │
-│  │    Satisfies: QS-FSR · QS-IFR                           │   │
+│  │ 📄 audit_report_Q1_2026.pdf            Approved          │   │
+│  │    Template: Internal Audit Report                       │   │
+│  │    Uploaded: 2026-04-05  by: Quality Office             │   │
+│  │    Satisfies: ISO21001-9.2 · ISO9001-9.2                │   │
 │  │    [View document]  [View extraction]                   │   │
 │  └─────────────────────────────────────────────────────────┘   │
 │                                                                 │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │ 📄 employer_survey_2025.pdf            Needs review      │   │
-│  │    Template: Employer Survey                             │   │
-│  │    Uploaded: 2026-04-01  by: External Relations         │   │
-│  │    Satisfies: QS-ER · QS-EO  ← pending approval         │   │
-│  │    [Review now]                                         │   │
-│  └─────────────────────────────────────────────────────────┘   │
-│                                                                 │
-│  Missing evidence for failing controls:                         │
+│  Missing evidence for failing/pending controls:                 │
 │  ────────────────────────────────────────────────────────────  │
-│  ⚠ QS-ER needs: employer_survey (0 approved on file)           │
-│     [Upload employer survey]                                    │
-│  ⚠ QS-CPF needs: publication_list with citation counts         │
-│     Current document missing citation_count field — re-extract  │
-│     [Review extraction]                                         │
+│  ⚠ ISO21001-6.1 needs: risk_register (0 approved on file)      │
+│     [Upload risk register]                                      │
+│  ⚠ ISO21001-9.2 needs audit_report updated within last 90 days  │
+│     Last approved: 2025-12-10  — overdue                        │
+│     [Upload new audit report]                                   │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -319,14 +306,17 @@ Sorted action list: what to do next to improve framework compliance the most.
 Each item = one failing or NEEDS_EVIDENCE test. Sorted by: `control_weight × (1 − current_progress)` descending — highest-impact gaps first.
 
 ```
-Priority  Control         Weight  Gap              Action required
-────────  ──────────────  ──────  ───────────────  ──────────────────────────────────
-  1       QS-CPF          20%     KPI below 5.0    Upload publication lists for
-                                  (current: 2.3)   IHEC, FSB, ENICarthage (missing)
-  2       QS-ER           10%     0 docs on file   Upload employer survey results
-  3       THE-TEACH-DOC   6%      0 docs on file   Upload PhD enrollment lists
-  4       QS-IFR          5%      KPI below 10%    Update faculty records with
-                                  (current: 3%)    international degree field
+Priority  Control            Gap                    Action required
+────────  ─────────────────  ─────────────────────  ───────────────────────────────────
+  1       ISO21001-6.1       0 docs on file          Upload risk register
+          Risk register                              (affects 18 institutions)
+  2       ISO21001-9.2       Last audit > 90 days    Upload Q1 2026 audit reports
+          Internal audit     (11 institutions)       for overdue institutions
+  3       GREENMETRIC-ENERGY KPI below threshold     Upload energy_report for
+          Energy/student     (current: 85 kWh,       INSAT, IHEC, FSB (missing)
+                             threshold: 60 kWh)
+  4       ISO21001-7.1       3 institutions missing  Upload faculty records for
+          Faculty records    hiring_dossier docs     Nabeul, Bizerte campuses
 ```
 
 ---
@@ -532,68 +522,61 @@ On document approval, the service:
 
 ---
 
-## 9. QS Indicator Mapping (Seed Data)
-
-| QS Indicator | Code | Weight | Tests | Templates Linked |
-|---|---|---|---|---|
-| Academic Reputation | `QS-AR` | 30% | DOCUMENT_UPLOAD: qs_academic_reputation_results | `qs_academic_reputation_results` |
-| Employer Reputation | `QS-ER` | 15% | DOCUMENT_UPLOAD: employer_survey + qs_employer_reputation_results | `employer_survey`, `qs_employer_reputation_results` |
-| Faculty/Student Ratio | `QS-FSR` | 10% | AUTOMATED_KPI: ACA-01 + DOCUMENT_UPLOAD: faculty_record | `faculty_record`, `grade_sheet` |
-| Citations per Faculty | `QS-CPF` | 20% | AUTOMATED_KPI: RES-01 + DOCUMENT_UPLOAD: publication_list | `publication_list` |
-| International Faculty Ratio | `QS-IFR` | 5% | AUTOMATED_KPI: INT-01 + DOCUMENT_UPLOAD: faculty_record | `faculty_record` |
-| International Student Ratio | `QS-ISR` | 5% | AUTOMATED_KPI: INT-02 + DOCUMENT_UPLOAD: grade_sheet | `grade_sheet`, `mobility_report` |
-| International Research Network | `QS-IRN` | 5% | AUTOMATED_KPI: RES-04 + DOCUMENT_UPLOAD: publication_list | `publication_list` |
-| Employment Outcomes | `QS-EO` | 5% | DOCUMENT_UPLOAD: employer_survey | `employer_survey` |
-| Sustainability | `QS-SUST` | 5% | AUTOMATED_KPI: ESG composite + DOCUMENT_UPLOAD: energy_report | `energy_report`, `sustainability_survey` |
-
----
-
-## 10. ARWU Control Mapping
-
-ARWU has 6 indicators. Nobel/Fields controls are tracked as binary (current value = 0 for UCAR — included for completeness and future state visibility, status = NEEDS_EVIDENCE until evidence exists).
-
-| Indicator | Code | Weight | Tests | Templates |
-|---|---|---|---|---|
-| Alumni winning Nobel / Fields | `ARWU-ALUMNI` | 10% | ATTESTATION (binary: yes/no + source) | — |
-| Staff winning Nobel / Fields | `ARWU-AWARD` | 20% | ATTESTATION (binary) | — |
-| Highly Cited Researchers | `ARWU-HICI` | 20% | AUTOMATED_KPI: RES-02 (h-index) + DOCUMENT_UPLOAD | `publication_list` |
-| Papers in Nature & Science | `ARWU-NS` | 20% | DOCUMENT_UPLOAD: publication_list — extraction must include journal field; evaluator filters for Nature/Science titles | `publication_list` |
-| Papers indexed in SCI/SSCI | `ARWU-PUB` | 20% | AUTOMATED_KPI: RES-03 (publications per faculty) — these are distinct indicators: NS counts only Nature & Science; PUB counts all SCI/SSCI-indexed journals | `publication_list` |
-| Per-capita academic performance | `ARWU-PCP` | 10% | AUTOMATED_KPI: composite of above ÷ FTE faculty | `faculty_record` |
-
----
-
-## 11. ISO 21001:2018 Control Mapping (demo scope — 12 key clauses)
+## 9. ISO 9001:2015 Control Mapping (Seed Data)
 
 | Clause | Code | Control Name | Test Type | Templates |
 |---|---|---|---|---|
-| 4.1 | `ISO-4.1` | Understanding the organization and context | ATTESTATION | — |
-| 4.4 | `ISO-4.4` | EOMS scope defined and documented | DOCUMENT_UPLOAD | `governance_charter` |
-| 6.1 | `ISO-6.1` | Risk-based thinking — risk register current | DOCUMENT_UPLOAD (≤30 days old) | `risk_register` |
-| 7.1 | `ISO-7.1` | Competence — faculty qualification records on file | DOCUMENT_UPLOAD | `faculty_record`, `hiring_dossier` |
-| 7.5 | `ISO-7.5` | Documented information control | AUTOMATED_KPI: GOV-01 | — |
-| 8.2 | `ISO-8.2` | Educational product requirements — grade results documented | DOCUMENT_UPLOAD | `grade_sheet` |
-| 8.3 | `ISO-8.3` | Design of educational products — syllabi on file | DOCUMENT_UPLOAD | `syllabus` |
-| 8.5 | `ISO-8.5` | Operational planning — disaster recovery procedure | DOCUMENT_UPLOAD | `disaster_recovery_procedure` |
-| 9.1 | `ISO-9.1` | Monitoring and measurement — budget reports | DOCUMENT_UPLOAD | `budget_report` |
-| 9.2 | `ISO-9.2` | Internal audit completed on schedule | DOCUMENT_UPLOAD | `audit_report` |
-| 9.3 | `ISO-9.3` | Management review — meeting minutes on file | DOCUMENT_UPLOAD | `meeting_minutes` |
-| 10.2 | `ISO-10.2` | Nonconformity closure rate within 90 days | AUTOMATED_KPI: GOV-02 | `audit_report` |
+| 4.3 | `ISO9001-4.3` | QMS scope defined | DOCUMENT_UPLOAD | `governance_charter` |
+| 6.1 | `ISO9001-6.1` | Risk register current (≤30 days) | DOCUMENT_UPLOAD | `risk_register` |
+| 7.2 | `ISO9001-7.2` | Staff competence records on file | DOCUMENT_UPLOAD | `faculty_record`, `hiring_dossier` |
+| 7.5 | `ISO9001-7.5` | Document control compliance | AUTOMATED_KPI: GOV-01 | — |
+| 8.1 | `ISO9001-8.1` | Operational planning — key procedures documented | DOCUMENT_UPLOAD | `syllabus`, `disaster_recovery_procedure` |
+| 9.1 | `ISO9001-9.1` | Monitoring & measurement — performance data | DOCUMENT_UPLOAD | `budget_report`, `grade_sheet` |
+| 9.2 | `ISO9001-9.2` | Internal audit completed on schedule | DOCUMENT_UPLOAD | `audit_report` |
+| 9.3 | `ISO9001-9.3` | Management review meeting minutes | DOCUMENT_UPLOAD | `meeting_minutes` |
+| 10.2 | `ISO9001-10.2` | Nonconformity closure rate | AUTOMATED_KPI: GOV-02 | `audit_report` |
+| 10.3 | `ISO9001-10.3` | Continual improvement — evidence of action taken | ATTESTATION | — |
 
 ---
 
-## 12. MESRS Control Mapping (demo scope — placeholder)
+## 10. ISO 21001:2018 Control Mapping (Seed Data)
 
-MESRS controls are seeded from publicly available ministerial circulars. For demo purposes, 8 controls are defined covering: student enrollment reporting, faculty qualification declarations, budget submission compliance, academic calendar adherence, exam result reporting, infrastructure safety certification, annual institutional report submission, and research output declaration.
-
-Each MESRS control is a `DOCUMENT_UPLOAD` test mapped to the relevant template. Thresholds are binary (document present and approved = PASSING).
+| Clause | Code | Control Name | Test Type | Templates |
+|---|---|---|---|---|
+| 4.1 | `ISO21001-4.1` | Context of the organization understood | ATTESTATION | — |
+| 4.4 | `ISO21001-4.4` | EOMS scope defined and documented | DOCUMENT_UPLOAD | `governance_charter` |
+| 6.1 | `ISO21001-6.1` | Risk register current (≤30 days) | DOCUMENT_UPLOAD | `risk_register` |
+| 7.1 | `ISO21001-7.1` | Faculty competence records on file | DOCUMENT_UPLOAD | `faculty_record`, `hiring_dossier` |
+| 7.2 | `ISO21001-7.2` | Training fulfillment rate ≥ 80% | AUTOMATED_KPI: HR-05 | — |
+| 7.5 | `ISO21001-7.5` | Documented information control | AUTOMATED_KPI: GOV-01 | — |
+| 8.2 | `ISO21001-8.2` | Student performance monitoring — grades documented | DOCUMENT_UPLOAD | `grade_sheet` |
+| 8.3 | `ISO21001-8.3` | Curriculum design — syllabi on file | DOCUMENT_UPLOAD | `syllabus` |
+| 8.5 | `ISO21001-8.5` | Operational planning — disaster recovery | DOCUMENT_UPLOAD | `disaster_recovery_procedure` |
+| 9.1 | `ISO21001-9.1` | Monitoring & measurement — budget reports | DOCUMENT_UPLOAD | `budget_report` |
+| 9.2 | `ISO21001-9.2` | Internal audit completed on schedule | DOCUMENT_UPLOAD | `audit_report` |
+| 9.3 | `ISO21001-9.3` | Management review — meeting minutes | DOCUMENT_UPLOAD | `meeting_minutes` |
 
 ---
 
-## 13. Open Questions (demo scope)
+## 11. UI GreenMetric Control Mapping (Seed Data)
+
+GreenMetric is NETWORK-scoped: the aggregate across all UCAR institutions is what's submitted. Each control has a quantitative threshold from the GreenMetric scoring rubric.
+
+| Category | Code | Control | Test Type | KPI / Templates |
+|---|---|---|---|---|
+| Setting & Infrastructure | `GM-SI` | Green area ratio + open space on campus | DOCUMENT_UPLOAD + ATTESTATION | — |
+| Energy & Climate Change | `GM-ENERGY` | Energy per student ≤ 60 kWh/student | AUTOMATED_KPI: ESG-01 + DOCUMENT_UPLOAD | `energy_report` |
+| Waste | `GM-WASTE` | Recycling rate ≥ 50% | AUTOMATED_KPI: ESG-04 + DOCUMENT_UPLOAD | `waste_report` |
+| Water | `GM-WATER` | Water conservation programs in place | DOCUMENT_UPLOAD | `water_report` |
+| Transport | `GM-TRANSPORT` | Green transport rate ≥ 30% | AUTOMATED_KPI: ESG-05 + DOCUMENT_UPLOAD | `sustainability_survey` |
+| Education & Research | `GM-EDU` | Sustainability courses + SDG-linked research | AUTOMATED_KPI: ESG-08 + DOCUMENT_UPLOAD | `sustainability_survey` |
+
+---
+
+## 12. Open Questions
 
 | # | Question | Impact |
 |---|---|---|
-| Q1 | MESRS: which specific circulars define the mandatory document submission requirements? | MESRS control completeness and template mapping |
-| Q2 | ARWU Nobel/Fields attestations: should these auto-reset to NEEDS_EVIDENCE each year or persist until reversed? | Audit trail and period scoping |
-| Q3 | Network-scoped frameworks (QS, THE, ARWU): per-institution evidence contribution rows use `tenant_id = NULL` for aggregate — confirm this is the intended query pattern for the President view | Affects dashboard drill-down query design |
+| Q1 | GreenMetric Setting & Infrastructure: how is green area ratio measured — self-reported or from campus map data? | GM-SI evidence type and template design |
+| Q2 | ISO 9001 and ISO 21001 share many controls (6.1, 7.5, 9.2, 9.3) — should shared controls be deduplicated into one test or maintained separately per framework? | DB design: shared `control_evidence` rows vs. duplicated |
+| Q3 | Network-scoped GreenMetric controls: `tenant_id = NULL` for aggregate status row — confirm this is the intended query pattern | Affects President view dashboard queries |
