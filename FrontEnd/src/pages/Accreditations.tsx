@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useToast } from '@/src/components/ui/Toast';
 import {
   Search,
@@ -17,14 +17,25 @@ import {
   ChevronRight,
   UploadCloud,
   X,
+  Loader2,
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import {
-  accreditationFrameworks,
-  recommendedFrameworks,
+  AccreditationFramework,
   AccreditationStatus,
   AccreditationControl,
+  recommendedFrameworks,
 } from '@/src/data/accreditationMock';
+import {
+  ApiError,
+  accreditationApi,
+  ComplianceLevel,
+  ControlStatus,
+  FrameworkDetail,
+  FrameworkPosture,
+  FrameworkSummary,
+} from '@/src/lib/api';
+import { useAppStore } from '@/src/store';
 
 /* ─── Micro-Components ─── */
 
@@ -132,6 +143,69 @@ function TestTypeBadge({ type }: { type: string }) {
 
 type Tab = 'active' | 'available' | 'history';
 
+const COMPLIANCE_TO_STATUS: Record<ComplianceLevel, AccreditationFramework['status']> = {
+  COMPLIANT: 'Validé',
+  PARTIAL: 'En audit',
+  NON_COMPLIANT: 'En préparation',
+};
+
+const CATEGORY_TO_DOMAINS: Record<string, string[]> = {
+  QMS: ['Qualité'],
+  EOMS: ['Académique'],
+  SUSTAINABILITY: ['Environnement'],
+};
+
+function mapControl(
+  control: ControlStatus,
+  detail: FrameworkDetail | undefined,
+  category: string,
+): AccreditationControl {
+  const detailMatch = detail?.controls.find((c) => c.control_id === control.control_id);
+  const firstTest = detailMatch?.tests[0];
+  const total =
+    control.passing_test_ids.length + control.failing_test_ids.length || (detailMatch?.tests.length ?? 0);
+  return {
+    code: control.clause_ref,
+    name: control.name,
+    category,
+    testType: (firstTest?.test_type as AccreditationControl['testType']) ?? 'DOCUMENT_UPLOAD',
+    passingTests: control.passing_test_ids.length,
+    totalTests: total,
+    ownerRole: 'Resp. Qualité',
+    weight: control.weight,
+    status: control.status,
+    controlId: control.control_id,
+    frameworkCode: control.framework_code,
+    firstTestId: firstTest?.test_id,
+    firstTestTemplateCode: firstTest?.required_template_codes?.[0] ?? undefined,
+  };
+}
+
+function buildFramework(
+  summary: FrameworkSummary,
+  detail: FrameworkDetail | undefined,
+  posture: FrameworkPosture,
+  evidenceCompleted: number,
+  evidenceTotal: number,
+): AccreditationFramework {
+  return {
+    id: summary.code,
+    code: summary.code,
+    name: summary.name,
+    version: summary.version,
+    scope: 'INSTITUTION',
+    domains: CATEGORY_TO_DOMAINS[summary.category] ?? [summary.category || 'Autre'],
+    status: COMPLIANCE_TO_STATUS[posture.compliance_level],
+    description: summary.description || summary.full_name,
+    evidenceCompleted,
+    evidenceTotal,
+    controlsTotal: posture.total,
+    controlsPassing: posture.passing,
+    auditDate: `${posture.period_year}-12-31`,
+    controls: posture.controls.map((c) => mapControl(c, detail, summary.category)),
+  };
+}
+
 export function Accreditations() {
   const [activeTab, setActiveTab] = useState<Tab>('active');
   const [searchTerm, setSearchTerm] = useState('');
@@ -139,10 +213,68 @@ export function Accreditations() {
   const [domainFilter, setDomainFilter] = useState<string>('all');
   const [expandedControl, setExpandedControl] = useState<string | null>(null);
   const { showToast } = useToast();
-  
-  // Local state for optimistic updates
-  const [frameworks, setFrameworks] = useState<(typeof accreditationFrameworks)>(accreditationFrameworks);
+
+  const activeInstitutionCode = useAppStore((s) => s.activeInstitutionCode);
+  const setActiveInstitutionCode = useAppStore((s) => s.setActiveInstitutionCode);
+
+  const [institutions, setInstitutions] = useState<string[]>([]);
+  const [institution, setInstitution] = useState<string>(activeInstitutionCode ?? 'INSAT');
+  const [frameworks, setFrameworks] = useState<AccreditationFramework[]>([]);
   const [uploadModalControl, setUploadModalControl] = useState<AccreditationControl | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Load list of demo institutions once.
+  useEffect(() => {
+    accreditationApi
+      .listInstitutions()
+      .then((list) => {
+        setInstitutions(list);
+        if (!list.includes(institution) && list.length > 0) {
+          setInstitution(list[0]);
+        }
+      })
+      .catch((err: unknown) => {
+        const msg = err instanceof ApiError ? `${err.status} ${err.statusText}` : String(err);
+        setError(`Failed to load institutions: ${msg}`);
+      });
+    // run once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Load active frameworks for the selected institution.
+  const loadFrameworks = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const summaries = await accreditationApi.listFrameworks();
+      const enriched = await Promise.all(
+        summaries.map(async (summary) => {
+          const [detail, posture, evidence] = await Promise.all([
+            accreditationApi.getFramework(summary.code),
+            accreditationApi.status(summary.code, institution),
+            accreditationApi.evidence(summary.code, institution),
+          ]);
+          return buildFramework(summary, detail, posture, evidence.approved, evidence.total_evidence);
+        }),
+      );
+      setFrameworks(enriched);
+    } catch (err) {
+      const msg = err instanceof ApiError ? `${err.status} ${err.statusText}` : String(err);
+      setError(msg);
+      setFrameworks([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [institution]);
+
+  useEffect(() => {
+    void loadFrameworks();
+  }, [loadFrameworks]);
+
+  useEffect(() => {
+    setActiveInstitutionCode(institution);
+  }, [institution, setActiveInstitutionCode]);
 
   const filteredFrameworks = useMemo(() => {
     return frameworks.filter((fw) => {
@@ -153,7 +285,7 @@ export function Accreditations() {
       const matchDomain = domainFilter === 'all' || fw.domains.includes(domainFilter);
       return matchSearch && matchStatus && matchDomain;
     });
-  }, [searchTerm, statusFilter, domainFilter]);
+  }, [frameworks, searchTerm, statusFilter, domainFilter]);
 
   const allDomains = useMemo(() => {
     const set = new Set<string>();
@@ -167,42 +299,77 @@ export function Accreditations() {
     return Array.from(set);
   }, [frameworks]);
 
-  // Simulate Document Upload
-  const handleSimulateUpload = () => {
+  // Approve evidence via the live backend, then refetch the affected framework.
+  const handleSimulateUpload = async () => {
     if (!uploadModalControl) return;
-    const controlCode = uploadModalControl.code;
-    const controlName = uploadModalControl.name;
-    
-    setFrameworks(prev => prev.map(fw => {
-      const idx = fw.controls.findIndex(c => c.code === controlCode);
-      if (idx === -1) return fw;
-      
-      const newCtrls = [...fw.controls];
-      newCtrls[idx] = { ...newCtrls[idx], status: 'PASSING', passingTests: newCtrls[idx].totalTests };
-      
-      return { 
-        ...fw, 
-        controls: newCtrls,
-        controlsPassing: fw.controlsPassing + 1,
-        // simulate a small bump in evidence too
-        evidenceCompleted: fw.evidenceCompleted + 1
-      };
-    }));
-    
+    const ctrl = uploadModalControl;
+    const fwCode = ctrl.frameworkCode;
+    const controlId = ctrl.controlId;
+    const testId = ctrl.firstTestId;
     setUploadModalControl(null);
-    showToast(`Preuve validée — ${controlCode} : ${controlName}`, 'success');
+
+    if (!fwCode || !controlId || !testId) {
+      showToast('Action indisponible (contrôle non synchronisé).', 'warning');
+      return;
+    }
+
+    try {
+      const result = await accreditationApi.approveEvidence(fwCode, controlId, institution, {
+        test_id: testId,
+        doc_name: 'Preuve soumise via démo',
+        template_code: ctrl.firstTestTemplateCode ?? null,
+      });
+      showToast(
+        `Preuve validée — ${ctrl.code} : ${ctrl.name} → ${result.updated_control_status.status}`,
+        'success',
+      );
+      await loadFrameworks();
+    } catch (err) {
+      const msg = err instanceof ApiError ? `${err.status} ${err.statusText}` : String(err);
+      showToast(`Échec — ${msg}`, 'error');
+    }
   };
 
   return (
     <div className="space-y-6">
       {/* ── Header ── */}
-      <div>
-        <div className="flex items-center gap-3 mb-1">
-          <ShieldCheck size={22} className="text-blue-800" />
-          <h1 className="text-xl font-semibold text-slate-900">Accréditations & Conformité</h1>
+      <div className="flex items-end justify-between flex-wrap gap-3">
+        <div>
+          <div className="flex items-center gap-3 mb-1">
+            <ShieldCheck size={22} className="text-blue-800" />
+            <h1 className="text-xl font-semibold text-slate-900">Accréditations & Conformité</h1>
+            {loading && <Loader2 size={16} className="animate-spin text-blue-700" />}
+          </div>
+          <p className="text-sm text-slate-500 pl-[34px]">
+            Suivi de conformité des référentiels actifs, en préparation et historiques.
+          </p>
         </div>
-        <p className="text-sm text-slate-500 pl-[34px]">Suivi de conformité des référentiels actifs, en préparation et historiques.</p>
+        <div className="flex items-center gap-2">
+          <label htmlFor="acc-institution" className="text-xs text-slate-500 uppercase tracking-wide">
+            Institution
+          </label>
+          <select
+            id="acc-institution"
+            value={institution}
+            onChange={(e) => setInstitution(e.target.value)}
+            className="bg-white border border-slate-200 rounded-md px-3 py-1.5 text-sm text-slate-700 outline-none focus:border-blue-700"
+          >
+            {institutions.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+            {!institutions.includes(institution) && (
+              <option value={institution}>{institution}</option>
+            )}
+          </select>
+        </div>
       </div>
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-md px-4 py-2">
+          Impossible de charger les référentiels — {error}
+        </div>
+      )}
 
       {/* ── Tabs ── */}
       <div className="border-b border-slate-200">
@@ -346,7 +513,7 @@ function FrameworkRow({
   onToggle,
   onRequestUpload,
 }: {
-  fw: (typeof accreditationFrameworks)[number];
+  fw: AccreditationFramework;
   evidPct: number;
   ctrlPct: number;
   isExpanded: boolean;

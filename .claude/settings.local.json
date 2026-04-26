@@ -7,7 +7,9 @@
       "Bash(.venv/Scripts/python.exe -m py_compile backend/services/kpi_service/domain/result.py backend/services/kpi_service/domain/research.py backend/services/kpi_service/domain/academic.py backend/services/kpi_service/domain/employment.py backend/services/kpi_service/domain/international.py backend/services/kpi_service/domain/finance.py backend/services/kpi_service/domain/hr.py backend/services/kpi_service/domain/sustainability.py)",
       "PowerShell(docker exec -e PGPASSWORD=ucar deploy-postgres-1 psql -h 127.0.0.1 -U ucar -d ucar -c \"\\\\dt\" 2>&1)",
       "Bash(python -m scripts.seed_insat_dgim_dgpi)",
-      "*"
+      "*",
+      "Bash(git ls-tree *)",
+      "Bash(npx tsc *)"
     ]
   }
 }

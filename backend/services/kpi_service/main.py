@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 
 from backend.services.kpi_service.api.accreditation import router as accreditation_router
+from backend.services.kpi_service.api.professors import router as professors_router
 from backend.services.kpi_service.api.routes import router as kpi_router
 
 app = FastAPI(
@@ -15,3 +16,4 @@ app = FastAPI(
 
 app.include_router(kpi_router)
 app.include_router(accreditation_router)
+app.include_router(professors_router)

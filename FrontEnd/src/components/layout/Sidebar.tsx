@@ -7,6 +7,7 @@ import {
   ChevronLeft,
   ChevronRight,
   AlertCircle,
+  GraduationCap,
 } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useAppStore } from '@/src/store';
@@ -16,6 +17,7 @@ import logoSrc from '@/src/assets/logo-ucar.png';
 const navItems = [
   { icon: LayoutDashboard, label: 'Tableau de Bord', path: '/' },
   { icon: School, label: 'Carte du Réseau', path: '/institutions' },
+  { icon: GraduationCap, label: 'Corps Enseignant', path: '/professors' },
   { icon: ShieldCheck, label: 'Accréditations', path: '/accreditations' },
   { icon: Wallet, label: 'Finances', path: '/finance' },
   { icon: AlertCircle, label: 'Centre d\'Opérations', path: '/alertes' },
