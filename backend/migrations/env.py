@@ -29,13 +29,13 @@ import backend.services.ingestion_service.models  # noqa: F401, E402
 
 target_metadata = Base.metadata
 
-# Override sqlalchemy.url from environment if set
-db_url = os.environ.get("ALEMBIC_DB_URL") or os.environ.get("DATABASE_URL")
-if db_url:
-    config.set_main_option("sqlalchemy.url", db_url)
-
 def _sync_database_url() -> str:
-    url = get_settings().database_url
+    # Explicit env var takes priority over settings (useful when CWD != project root)
+    url = (
+        os.environ.get("ALEMBIC_DB_URL")
+        or os.environ.get("DATABASE_URL")
+        or get_settings().database_url
+    )
     return url.replace("+asyncpg", "+psycopg")
 
 
