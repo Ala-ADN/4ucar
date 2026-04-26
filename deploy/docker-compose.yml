@@ -63,6 +63,76 @@ services:
       - minio
       - elasticsearch
 
+  # ── Ingestion service ──────────────────────────────────────────────────────
+  ingestion-service:
+    build:
+      context: ..
+      dockerfile: deploy/docker/api.Dockerfile
+    env_file: .env.example
+    command: >
+      gunicorn backend.services.ingestion_service.main:app
+      -k uvicorn.workers.UvicornWorker
+      --workers 4
+      --bind 0.0.0.0:8010
+    environment:
+      UPLOAD_DIR: /app/uploads
+    ports:
+      - "8010:8010"
+    volumes:
+      - uploads:/app/uploads
+    depends_on: [postgres, redis]
+
+  # Extraction + normalization/validation workers (CPU-bound)
+  ingestion-worker-extraction:
+    build:
+      context: ..
+      dockerfile: deploy/docker/worker.Dockerfile
+    env_file: .env.example
+    command: >
+      celery -A backend.workers.celery_app worker
+      -Q extraction
+      -c 4
+      -l INFO
+      -n extraction@%h
+    environment:
+      UPLOAD_DIR: /app/uploads
+    volumes:
+      - uploads:/app/uploads
+    depends_on: [postgres, redis]
+
+  # OCR workers — separate pool, controlled concurrency (GPU-optional)
+  ingestion-worker-ocr:
+    build:
+      context: ..
+      dockerfile: deploy/docker/worker.Dockerfile
+    env_file: .env.example
+    command: >
+      celery -A backend.workers.celery_app worker
+      -Q ocr
+      -c 2
+      -l INFO
+      -n ocr@%h
+    environment:
+      UPLOAD_DIR: /app/uploads
+    volumes:
+      - uploads:/app/uploads
+    depends_on: [postgres, redis]
+
+  # Mapping workers — Claude API calls
+  ingestion-worker-mapping:
+    build:
+      context: ..
+      dockerfile: deploy/docker/worker.Dockerfile
+    env_file: .env.example
+    command: >
+      celery -A backend.workers.celery_app worker
+      -Q mapping
+      -c 2
+      -l INFO
+      -n mapping@%h
+    depends_on: [postgres, redis]
+
+  # ── Other services ─────────────────────────────────────────────────────────
   auth-service:
     build:
       context: ..
@@ -154,3 +224,4 @@ services:
 volumes:
   pgdata:
   miniodata:
+  uploads:

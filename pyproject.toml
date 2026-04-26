@@ -9,8 +9,10 @@ dependencies = [
     # --- Web framework ---
     "fastapi",
     "uvicorn[standard]",
+    "gunicorn",
     "python-multipart",
     "httpx",
+    "aiofiles",
 
     # --- Settings & validation ---
     "pydantic",
@@ -20,6 +22,7 @@ dependencies = [
     "sqlalchemy",
     "asyncpg",
     "psycopg[binary]",
+    "aiosqlite",           # test in-memory DB
     "alembic",
 
     # --- Cache / queue / pubsub ---
@@ -33,12 +36,20 @@ dependencies = [
     # --- Auth ---
     "python-jose[cryptography]",
     "passlib[bcrypt]",
-    "python-keycloak",
 
-    # --- Document ingestion / OCR ---
-    "pytesseract",
-    "pymupdf",
-    "openpyxl",
+    # --- Document ingestion ---
+    "pymupdf",             # PyMuPDF — native PDF extraction + page rendering
+    "openpyxl",            # Excel .xlsx read/write
+    "chardet",             # CSV encoding detection
+    "Pillow",              # image pre-processing before OCR
+
+    # --- OCR (PaddleOCR PP-StructureV2) ---
+    # CPU-only builds; pinned to avoid torch dependency via albumentations>=2.x
+    "paddlepaddle==2.6.2",
+    "paddleocr<3.0.0",
+    "albumentations==1.3.1",
+
+    # --- General document / data ---
     "pandas",
     "tabula-py",
     "python-docx",
@@ -48,7 +59,10 @@ dependencies = [
     "numpy",
     "shap",
     "sentence-transformers",
+
+    # --- AI / Claude API ---
     "anthropic",
+    "tenacity",            # retry logic for Claude API calls + other integrations
 
     # --- Report generation ---
     "weasyprint",
@@ -59,8 +73,7 @@ dependencies = [
     "prometheus-fastapi-instrumentator",
     "sentry-sdk",
 
-    # --- Resilience / utilities ---
-    "tenacity",
+    # --- Utilities ---
     "email-validator",
     "babel",
 ]
@@ -71,6 +84,7 @@ dev = [
     "pytest-asyncio",
     "pytest-cov",
     "pytest-mock",
+    "anyio[trio]",
     "ruff",
     "mypy",
     "pre-commit",
@@ -95,3 +109,16 @@ select = ["E", "F", "I", "B", "UP", "N", "ASYNC"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
+[dependency-groups]
+dev = [
+    "aiosqlite>=0.22.1",
+    "anyio>=4.13.0",
+    "httpx>=0.28.1",
+    "pytest>=9.0.3",
+    "pytest-asyncio>=1.3.0",
+    "pytest-mock>=3.15.1",
+]
