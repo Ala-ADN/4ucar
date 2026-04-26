@@ -26,6 +26,12 @@ class IngestionSettings(Settings):
     # Redis pub/sub channel
     events_channel: str = "data.events"
 
+    # Gemini mapping (prototype)
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-1.5-flash"
+    gemini_timeout_seconds: int = 20
+    mapping_cache_ttl_seconds: int = 86400
+
     @property
     def max_file_size_bytes(self) -> int:
         return self.max_file_size_mb * 1024 * 1024

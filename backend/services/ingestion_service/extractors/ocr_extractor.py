@@ -1,4 +1,4 @@
-"""OCR extractor — PaddleOCR with PP-StructureV2.
+"""OCR extractor — PaddleOCR PP-StructureV2.
 
 Used for:
   - Scanned PDFs (pages rendered to images by pdf_extractor.render_pages_as_images)
@@ -40,51 +40,130 @@ def _get_structure_engine():
         from paddleocr import PPStructure  # deferred — large import
 
         _STRUCTURE_ENGINE = PPStructure(
-            lang="fr",           # French primary; Arabic detected automatically by PP-StructureV2
+            lang="en",           # layout model only supports 'en'/'ch'; text recognition handles FR/AR
             show_log=False,
-            table=True,          # enable table structure recognition
-            layout=True,         # enable layout analysis
+            table=False,         # table model crashes on CPU/WSL2; use layout+OCR path instead
+            layout=False,        # skip layout analysis — run plain OCR on full image
+            use_angle_cls=False, # cls model not bundled; deskew handles rotation
         )
         _PADDLE_INITIALIZED = True
     return _STRUCTURE_ENGINE
 
 
-def preprocess_image(image_bytes: bytes, min_dpi: int = 150) -> tuple[np.ndarray, float]:
-    """Convert raw bytes → preprocessed numpy array for OCR.
+# ── Public interface ──────────────────────────────────────────────────────────
 
-    Returns (array, estimated_dpi). Raises ValueError if DPI is below threshold.
+
+def preprocess_image(image: Image.Image) -> tuple[Image.Image, bool]:
+    """Preprocess a PIL Image for OCR. Returns (processed_image, low_quality_flag).
+
+    low_quality is True when estimated DPI < 150. Processing continues regardless —
+    the flag surfaces a warning to the user rather than rejecting the file.
+
+    Steps (in order):
+    1. Flatten alpha channel (RGBA → RGB)
+    2. Convert to grayscale
+    3. Contrast enhancement
+    4. Sharpness enhancement
+    5. Deskew via horizontal projection profile variance maximization
     """
-    img = Image.open(io.BytesIO(image_bytes))
-
-    # Estimate DPI from image metadata
-    dpi_info = img.info.get("dpi", (72, 72))
+    # Estimate DPI from metadata — 72 is the PIL default when absent
+    dpi_info = image.info.get("dpi", (72, 72))
     estimated_dpi = float(dpi_info[0]) if isinstance(dpi_info, tuple) else float(dpi_info)
+    low_quality = estimated_dpi < 150
 
-    if estimated_dpi < min_dpi:
-        from backend.shared.exceptions import ImageResolutionTooLow
-        raise ImageResolutionTooLow(
-            detail=f"Estimated DPI: {estimated_dpi:.0f}. Minimum required: {min_dpi}."
-        )
+    # 1. Flatten alpha
+    if image.mode in ("RGBA", "LA", "PA"):
+        background = Image.new("RGB", image.size, (255, 255, 255))
+        background.paste(image, mask=image.split()[-1])
+        image = background
+    elif image.mode != "RGB":
+        image = image.convert("RGB")
 
-    # Grayscale + contrast enhancement + mild sharpen
-    img = img.convert("L")
-    img = ImageEnhance.Contrast(img).enhance(1.5)
-    img = img.filter(ImageFilter.SHARPEN)
+    # 2. Grayscale
+    image = image.convert("L")
 
-    return np.array(img), estimated_dpi
+    # 3. Contrast
+    image = ImageEnhance.Contrast(image).enhance(1.5)
+
+    # 4. Sharpness
+    image = ImageEnhance.Sharpness(image).enhance(1.2)
+
+    # 5. Deskew
+    image = _deskew(image)
+
+    return image, low_quality
 
 
-def extract_from_image_bytes(image_bytes: bytes) -> ExtractionResult:
-    """Run PP-StructureV2 on a single image and return ExtractionResult."""
-    arr, _ = preprocess_image(image_bytes)
+def extract_table_from_image(image: Image.Image) -> dict:
+    """Primary public interface. Run PP-StructureV2 on a PIL Image.
+
+    Returns a dict with:
+      headers        — list[str], first detected table's header row
+      rows           — list[list[str]], data rows
+      cell_metadata  — list[list[{confidence, bbox}]], rows × cols
+      table_count    — int, total tables detected in the image
+      avg_confidence — float, mean confidence across all cells
+      low_quality    — bool, True if estimated DPI < 150
+      raw_html       — str, raw HTML from PP-StructureV2 (first table)
+      all_tables     — list[dict], all detected tables (caller picks if > 1)
+
+    Bounding boxes are normalized [0.0, 1.0] relative to original image dimensions.
+    """
+    orig_w, orig_h = image.size
+    processed, low_quality = preprocess_image(image)
+    # PP-StructureV2 requires a 3-channel BGR uint8 array (OpenCV convention)
+    rgb = processed.convert("RGB")
+    img_array = np.array(rgb, dtype=np.uint8)[:, :, ::-1]  # RGB → BGR
+
     engine = _get_structure_engine()
-    return _run_structure(engine, arr, page=0)
+    result = engine(img_array)
+
+    tables = [r for r in result if r.get("type") == "table"]
+
+    if not tables:
+        return {
+            "headers": [],
+            "rows": [],
+            "cell_metadata": [],
+            "table_count": 0,
+            "avg_confidence": 0.0,
+            "low_quality": low_quality,
+            "raw_html": "",
+            "all_tables": [],
+        }
+
+    all_tables = [_parse_table_to_dict(t, orig_w, orig_h) for t in tables]
+
+    # Primary result: largest table by cell count
+    primary = max(all_tables, key=lambda t: len(t["rows"]) * max(len(t["headers"]), 1))
+
+    # Flatten all confidences for avg
+    all_confs = [
+        cell["confidence"]
+        for tbl in all_tables
+        for row in tbl["cell_metadata"]
+        for cell in row
+    ]
+    avg_confidence = float(np.mean(all_confs)) if all_confs else 0.0
+
+    return {
+        "headers": primary["headers"],
+        "rows": primary["rows"],
+        "cell_metadata": primary["cell_metadata"],
+        "table_count": len(tables),
+        "avg_confidence": avg_confidence,
+        "low_quality": low_quality,
+        "raw_html": primary["raw_html"],
+        "all_tables": all_tables,
+    }
 
 
 def extract_from_pdf_pages(page_images: list[bytes]) -> ExtractionResult:
-    """Run PP-StructureV2 across multiple rendered PDF pages and merge results."""
-    engine = _get_structure_engine()
+    """Run PP-StructureV2 across multiple rendered PDF pages and merge results.
 
+    Called from the Celery OCR task. Accepts raw bytes per page (hex-decoded
+    from the task payload). Merges rows across pages when column headers match.
+    """
     merged_headers: list[str] | None = None
     merged_rows: list[dict[str, str]] = []
     merged_header_bboxes: dict[str, BoundingBox] = {}
@@ -93,8 +172,8 @@ def extract_from_pdf_pages(page_images: list[bytes]) -> ExtractionResult:
     row_offset = 0
 
     for page_idx, image_bytes in enumerate(page_images):
-        arr, _ = preprocess_image(image_bytes)
-        page_result = _run_structure(engine, arr, page=page_idx)
+        pil_image = Image.open(io.BytesIO(image_bytes))
+        page_result = _extraction_result_from_pil(pil_image, page=page_idx)
 
         if not page_result.headers:
             continue
@@ -103,7 +182,7 @@ def extract_from_pdf_pages(page_images: list[bytes]) -> ExtractionResult:
             merged_headers = page_result.headers
             merged_header_bboxes = page_result.header_bboxes
         elif page_result.headers != merged_headers:
-            # Different column structure on subsequent page — skip (likely footer/header)
+            # Different column structure — likely a footer/header page, skip
             continue
 
         for local_idx, row in enumerate(page_result.rows):
@@ -131,77 +210,165 @@ def extract_from_pdf_pages(page_images: list[bytes]) -> ExtractionResult:
     )
 
 
-def _run_structure(engine, img_array: np.ndarray, page: int) -> ExtractionResult:
-    """Run PP-StructureV2 on one image array and extract the dominant table."""
-    result = engine(img_array)
-
-    # Find the table region with the most cells
-    table_region = None
-    for region in result:
-        if region.get("type") == "table":
-            if table_region is None or (
-                len(region.get("res", {}).get("html", ""))
-                > len(table_region.get("res", {}).get("html", ""))
-            ):
-                table_region = region
-
-    if table_region is None:
-        return ExtractionResult(headers=[], rows=[], preview=[], total_rows=0)
-
-    return _parse_table_region(table_region, page)
+def extract_from_image_bytes(image_bytes: bytes) -> ExtractionResult:
+    """Run PP-StructureV2 on a single raw image bytes payload."""
+    pil_image = Image.open(io.BytesIO(image_bytes))
+    return _extraction_result_from_pil(pil_image, page=0)
 
 
-def _parse_table_region(region: dict, page: int) -> ExtractionResult:
-    """Extract headers, rows, bounding boxes, and confidence scores from a PP-StructureV2 table region."""
+# ── Internal helpers ──────────────────────────────────────────────────────────
+
+
+def _deskew(image: Image.Image) -> Image.Image:
+    """Correct skew by finding the angle that maximizes horizontal projection variance."""
+    arr = np.array(image)
+    # Binarize: dark pixels = 1
+    binary = (arr < 128).astype(np.float32)
+
+    best_angle = 0.0
+    best_variance = -1.0
+
+    for angle in np.arange(-10, 10.5, 0.5):
+        rotated = image.rotate(angle, expand=False, fillcolor=255)
+        rot_arr = np.array(rotated)
+        rot_bin = (rot_arr < 128).astype(np.float32)
+        row_sums = rot_bin.sum(axis=1)
+        variance = float(np.var(row_sums))
+        if variance > best_variance:
+            best_variance = variance
+            best_angle = angle
+
+    if abs(best_angle) < 0.5:
+        return image
+    return image.rotate(best_angle, expand=False, fillcolor=255)
+
+
+def _parse_table_to_dict(region: dict, orig_w: int, orig_h: int) -> dict:
+    """Parse one PP-StructureV2 table region into the extract_table_from_image dict format."""
     res = region.get("res", {})
+    raw_html = res.get("html", "")
 
-    # PP-StructureV2 provides cell-level recognition results
-    cell_results: list[dict] = res.get("cell_bbox", [])
-    rec_res: list[list] = res.get("rec_res", [[]])  # [[text, confidence], ...]
+    cells_2d = _parse_html_table(raw_html)
+    if not cells_2d:
+        return {"headers": [], "rows": [], "cell_metadata": [], "raw_html": raw_html}
 
-    if not cell_results and not rec_res:
-        return ExtractionResult(headers=[], rows=[], preview=[], total_rows=0)
-
-    # Attempt structured extraction from HTML output
-    try:
-        from html.parser import HTMLParser
-        cells = _parse_html_table(res.get("html", ""))
-    except Exception:
-        cells = []
-
-    if not cells:
-        return ExtractionResult(headers=[], rows=[], preview=[], total_rows=0)
-
-    # First row is assumed to be headers
-    headers = [str(c).strip() for c in cells[0]]
+    headers = [str(c).strip() for c in cells_2d[0]]
     headers = [h if h else f"col_{i + 1}" for i, h in enumerate(headers)]
 
-    header_bboxes: dict[str, BoundingBox] = {}
+    # PP-StructureV2 cell_bbox: list of [x1,y1,x2,y2] per recognized cell
+    bbox_list: list[list[float]] = _extract_bbox_list(res.get("cell_bbox", []))
+    # rec_res: [[text, confidence], ...] per detected text region
+    rec_res: list[list] = res.get("rec_res", [])
+
+    # Build a confidence lookup by cell index
+    conf_by_idx = {i: float(item[1]) if len(item) > 1 else 1.0 for i, item in enumerate(rec_res)}
+
+    rows: list[list[str]] = []
+    cell_metadata: list[list[dict]] = []
+    flat_idx = 0
+
+    for row_cells in cells_2d[1:]:
+        padded = row_cells + [""] * (len(headers) - len(row_cells))
+        row_str: list[str] = []
+        row_meta: list[dict] = []
+
+        for col_idx, value in enumerate(padded[:len(headers)]):
+            row_str.append(str(value).strip())
+
+            # Bounding box — normalized to [0,1]
+            if flat_idx < len(bbox_list):
+                b = bbox_list[flat_idx]
+                bbox_norm = [
+                    b[0] / orig_w, b[1] / orig_h,
+                    b[2] / orig_w, b[3] / orig_h,
+                ]
+            else:
+                bbox_norm = [0.0, 0.0, 0.0, 0.0]
+
+            confidence = conf_by_idx.get(flat_idx, 1.0)
+            row_meta.append({"confidence": confidence, "bbox": bbox_norm})
+            flat_idx += 1
+
+        rows.append(row_str)
+        cell_metadata.append(row_meta)
+
+    return {
+        "headers": headers,
+        "rows": rows,
+        "cell_metadata": cell_metadata,
+        "raw_html": raw_html,
+    }
+
+
+def _extraction_result_from_pil(image: Image.Image, page: int) -> ExtractionResult:
+    """Convert a PIL Image → ExtractionResult (used by the bytes/PDF paths).
+
+    PP-StructureV2 is run in plain OCR mode (table=False, layout=False) to avoid
+    a PaddlePaddle CPU/WSL2 crash in the table structure model. Text detections
+    are reconstructed into rows by y-coordinate proximity, same approach as the
+    native PDF fallback.
+    """
+    orig_w, orig_h = image.size
+    processed, _ = preprocess_image(image)
+    # PaddleOCR requires a 3-channel BGR uint8 array (OpenCV convention)
+    rgb = processed.convert("RGB")
+    img_array = np.array(rgb, dtype=np.uint8)[:, :, ::-1]  # RGB → BGR
+
+    engine = _get_structure_engine()
+    result = engine(img_array)
+
+    # In plain OCR mode the engine returns a list of detection dicts directly:
+    # [{"type": "...", "bbox": [x1,y1,x2,y2], "res": [[text, confidence], ...]}, ...]
+    # Flatten all detected text regions sorted by y then x.
+    detections: list[tuple[float, float, str, float]] = []  # (y, x, text, conf)
+    for region in result:
+        res = region.get("res", [])
+        bbox = region.get("bbox", [0, 0, 0, 0])
+        x1, y1 = float(bbox[0]), float(bbox[1])
+        if isinstance(res, list):
+            for item in res:
+                if isinstance(item, (list, tuple)) and len(item) >= 2:
+                    text, conf = str(item[0]).strip(), float(item[1])
+                elif isinstance(item, dict):
+                    text, conf = str(item.get("text", "")).strip(), float(item.get("confidence", 1.0))
+                else:
+                    continue
+                if text:
+                    detections.append((y1, x1, text, conf))
+
+    if not detections:
+        return ExtractionResult(headers=[], rows=[], preview=[], total_rows=0)
+
+    # Group detections into rows by y-band (tolerance = 10px at 300 DPI)
+    y_tolerance = 10
+    row_map: dict[int, list[tuple[float, str, float]]] = {}
+    for y, x, text, conf in sorted(detections):
+        band = round(y / y_tolerance)
+        row_map.setdefault(band, []).append((x, text, conf))
+
+    rows_raw = [
+        sorted(cells, key=lambda c: c[0])
+        for _, cells in sorted(row_map.items())
+    ]
+
+    if not rows_raw:
+        return ExtractionResult(headers=[], rows=[], preview=[], total_rows=0)
+
+    # First row is headers
+    headers = [cell[1] for cell in rows_raw[0]]
+    headers = [h if h else f"col_{i+1}" for i, h in enumerate(headers)]
+
+    data_rows: list[dict[str, str]] = []
     cell_bboxes: dict[tuple[int, str], BoundingBox] = {}
     cell_confidences: dict[tuple[int, str], float] = {}
 
-    # Match bounding boxes from cell_bbox list if available
-    bbox_list = _extract_bbox_list(cell_results)
-    conf_list = [item[1] if len(item) > 1 else 1.0 for item in rec_res]
-
-    data_rows: list[dict[str, str]] = []
-    flat_cell_idx = 0
-
-    for row_idx, row in enumerate(cells[1:]):
-        padded = row + [""] * (len(headers) - len(row))
+    for row_idx, row_cells in enumerate(rows_raw[1:]):
+        padded = row_cells + [(0.0, "", 1.0)] * (len(headers) - len(row_cells))
         row_dict: dict[str, str] = {}
-        for col_idx, (header, value) in enumerate(zip(headers, padded)):
-            row_dict[header] = str(value).strip()
-
-            if flat_cell_idx < len(bbox_list):
-                b = bbox_list[flat_cell_idx]
-                box = BoundingBox(x=b[0], y=b[1], w=b[2] - b[0], h=b[3] - b[1], page=page)
-                cell_bboxes[(row_idx, header)] = box
-            if flat_cell_idx < len(conf_list):
-                cell_confidences[(row_idx, header)] = float(conf_list[flat_cell_idx])
-
-            flat_cell_idx += 1
-
+        for col_idx, (x, text, conf) in enumerate(padded[:len(headers)]):
+            header = headers[col_idx]
+            row_dict[header] = text
+            cell_confidences[(row_idx, header)] = conf
         data_rows.append(row_dict)
 
     return ExtractionResult(
@@ -209,14 +376,13 @@ def _parse_table_region(region: dict, page: int) -> ExtractionResult:
         rows=data_rows,
         preview=data_rows[:5],
         total_rows=len(data_rows),
-        header_bboxes=header_bboxes,
         cell_bboxes=cell_bboxes,
         cell_confidences=cell_confidences,
     )
 
 
 def _parse_html_table(html: str) -> list[list[str]]:
-    """Parse HTML table string into a 2D list of cell strings."""
+    """Parse PP-StructureV2 HTML table output into a 2D list of cell strings."""
     from html.parser import HTMLParser
 
     class TableParser(HTMLParser):

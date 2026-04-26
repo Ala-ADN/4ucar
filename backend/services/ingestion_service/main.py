@@ -26,7 +26,36 @@ def create_app() -> FastAPI:
         version="1.0.0",
         docs_url="/docs" if settings.app_env == "local" else None,
         redoc_url=None,
+        swagger_ui_init_oauth={},
+        openapi_tags=[],
     )
+
+    from fastapi.openapi.utils import get_openapi
+
+    def custom_openapi():
+        if app.openapi_schema:
+            return app.openapi_schema
+        schema = get_openapi(
+            title=app.title,
+            version=app.version,
+            description=app.description,
+            routes=app.routes,
+        )
+        schema.setdefault("components", {})
+        schema["components"]["securitySchemes"] = {
+            "BearerAuth": {
+                "type": "http",
+                "scheme": "bearer",
+                "bearerFormat": "JWT",
+            }
+        }
+        for path in schema.get("paths", {}).values():
+            for operation in path.values():
+                operation["security"] = [{"BearerAuth": []}]
+        app.openapi_schema = schema
+        return schema
+
+    app.openapi = custom_openapi
 
     # CORS — allow all in local, restrict in production
     origins = ["*"] if settings.app_env == "local" else ["https://erp.ucar.tn"]

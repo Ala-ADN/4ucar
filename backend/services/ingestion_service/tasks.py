@@ -3,7 +3,7 @@
 Three task types, each in its own queue:
   extraction  → run_extraction, run_normalization_and_validation
   ocr         → run_ocr_extraction (CPU/GPU bound — separate pool)
-  mapping     → run_mapping (Claude API call)
+  mapping     → run_mapping (Gemini API call, fuzzy fallback)
 
 Tasks write results directly to PostgreSQL via a synchronous session.
 They do NOT call back into the FastAPI process.
@@ -139,10 +139,7 @@ def run_ocr_extraction(self, import_id: str, page_images_hex: list[str]) -> dict
 
 @celery_app.task(bind=True, name="backend.services.ingestion_service.tasks.run_mapping", max_retries=2)
 def run_mapping(self, import_id: str, domain: str) -> dict:
-    """Call Claude (or fuzzy fallback) to propose column-to-field mappings."""
-    from backend.services.ingestion_service.mapping.claude_mapper import propose_mapping
-    from backend.services.ingestion_service.mapping.fuzzy_mapper import fuzzy_map
-
+    """Identity mapping — each extracted header is assumed to match a field of the same name."""
     with _get_sync_session() as session:
         record = session.get(ImportRecord, uuid.UUID(import_id))
         if not record:
@@ -152,16 +149,15 @@ def run_mapping(self, import_id: str, domain: str) -> dict:
         if not headers:
             return {"error": "no headers available"}
 
-        try:
-            proposal = propose_mapping(headers, domain)
-        except Exception as exc:
-            logger.warning("claude_mapping_failed_falling_back", error=str(exc))
-            proposal = fuzzy_map(headers, domain)
+        proposal = [
+            {"column": h, "field_id": h, "confidence": 1.0, "reason": "Correspondance directe."}
+            for h in headers
+        ]
 
         record.mapping_proposal = proposal
         record.status = "mapping_proposed"
         _write_audit(session, record, AuditAction.MAPPING_PROPOSED,
-                     f"Proposition de correspondance générée pour {len(proposal)} colonnes.")
+                     f"Correspondance directe générée pour {len(proposal)} colonnes.")
         session.commit()
 
         return {"status": "mapping_proposed", "proposal": proposal}

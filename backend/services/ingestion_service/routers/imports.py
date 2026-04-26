@@ -69,7 +69,7 @@ async def get_status(
         response["headers"] = record.extracted_headers
         response["preview"] = record.extracted_preview
         response["total_rows"] = record.total_rows
-        if record.available_sheets:
+        if getattr(record, "available_sheets", None):
             response["available_sheets"] = record.available_sheets
 
     return response
@@ -88,23 +88,26 @@ async def get_mapping(
     require_own_institution(record.institution_id, current_user)
 
     if record.status == "extracted":
-        # Enqueue mapping task
-        from backend.services.ingestion_service.tasks import run_mapping
-
-        domain = record.domain or "academic"
-        task = run_mapping.apply_async(args=[str(import_id), domain], queue="mapping")
-        record.mapping_task_id = task.id
-        record.status = "mapping_pending"
+        # Build identity mapping inline — no external API, no queue
+        headers = record.extracted_headers or []
+        proposal = [
+            {"column": h, "field_id": h, "confidence": 1.0, "reason": "Correspondance directe."}
+            for h in headers
+        ]
+        record.mapping_proposal = proposal
+        record.status = "mapping_proposed"
         await db.commit()
-        return {"status": "mapping_pending", "task_id": task.id}
 
-    if record.status in ("mapping_pending",):
-        return {"status": "mapping_pending"}
-
-    if record.mapping_proposal:
+    if record.status in ("mapping_proposed", "mapping_confirmed", "validated", "committed"):
+        if not record.mapping_proposal and record.extracted_headers:
+            record.mapping_proposal = [
+                {"column": h, "field_id": h, "confidence": 1.0, "reason": "Correspondance directe."}
+                for h in record.extracted_headers
+            ]
+            await db.commit()
         return {
             "status": record.status,
-            "proposal": record.mapping_proposal,
+            "proposal": record.mapping_proposal or [],
         }
 
     raise ValidationFailed(detail=f"Statut inattendu : {record.status}")
